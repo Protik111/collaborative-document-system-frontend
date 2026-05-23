@@ -60,6 +60,7 @@ import {
   ChevronRight,
   Settings,
   Share2,
+  Clock,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -661,14 +662,18 @@ export default function EditorPage() {
                   className="text-5xl font-bold tracking-tight bg-transparent border-0 h-auto p-0 focus-visible:ring-0 mb-4"
                   placeholder="Untitled"
                />
-               <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                     <Users className="h-4 w-4" />
+               <div className="flex items-center gap-6 text-sm text-neutral-500 font-medium">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+                     <Users className="h-3.5 w-3.5" />
                      <span>{members.length} Collaborators</span>
                   </div>
                   <div className="flex items-center gap-2">
-                     <History className="h-4 w-4" />
-                     <span>Last edited {document ? new Date(document.updated_at).toLocaleDateString() : 'recently'}</span>
+                     <Clock className="h-3.5 w-3.5" />
+                     <span>{(blocks.reduce((acc, b) => acc + (typeof b.content === 'string' ? b.content.split(/\s+/).filter(Boolean).length : 0), 0) / 200).toFixed(1)} min read</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <span className="h-3.5 w-3.5 flex items-center justify-center text-[10px] border border-neutral-500 rounded-sm">W</span>
+                     <span>{blocks.reduce((acc, b) => acc + (typeof b.content === 'string' ? b.content.split(/\s+/).filter(Boolean).length : 0), 0)} words</span>
                   </div>
                </div>
             </div>

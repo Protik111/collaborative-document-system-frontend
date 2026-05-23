@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import toast from "react-hot-toast";
 
+import { Plus, Search, MoreVertical, LayoutGrid, List as ListIcon, Clock, Users } from "lucide-react";
+
 export default function DashboardPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [newName, setNewName] = useState("");
@@ -43,48 +45,97 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Your Workspaces</h1>
-        <Button onClick={() => router.refresh()}>↻ Refresh</Button>
+    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight premium-gradient-text">Workspaces</h1>
+          <p className="text-muted-foreground mt-1">Manage and collaborate on your shared documents</p>
+        </div>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search workspaces..." 
+              className="pl-10 bg-white/5 border-white/10 h-10 focus:ring-1 focus:ring-white/20"
+            />
+          </div>
+          <Button onClick={() => router.refresh()} variant="outline" className="border-white/10 hover:bg-white/5">
+            ↻ Refresh
+          </Button>
+        </div>
       </div>
 
-      <div className="flex gap-2 mb-8">
-        <Input
-          placeholder="New workspace name"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && createWorkspace()}
-        />
-        <Button onClick={createWorkspace} disabled={loading || !newName.trim()}>
-          {loading ? "Creating..." : "Create"}
-        </Button>
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Create Workspace Card */}
+        <Card className="group cursor-pointer border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/20 h-full min-h-[160px] flex flex-col items-center justify-center space-y-3">
+          <div className="size-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform">
+            <Plus className="size-6 text-neutral-400 group-hover:text-white transition-colors" />
+          </div>
+          <div className="text-center">
+             <p className="font-medium text-neutral-300 group-hover:text-white transition-colors">Create Workspace</p>
+             <p className="text-xs text-neutral-500">Start a new collaboration</p>
+          </div>
+          
+          <div className="absolute inset-x-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Input
+              placeholder="Workspace name..."
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createWorkspace()}
+              className="bg-neutral-900 border-white/10 h-8 text-xs mb-2"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <Button 
+              onClick={(e) => { e.stopPropagation(); createWorkspace(); }} 
+              disabled={loading || !newName.trim()}
+              className="w-full h-8 text-xs bg-neutral-100 text-neutral-900 hover:bg-white"
+            >
+              {loading ? "Creating..." : "Confirm"}
+            </Button>
+          </div>
+        </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {workspaces.map((ws) => (
           <Card
             key={ws.id}
-            className="cursor-pointer hover:shadow-md transition"
+            className="group relative cursor-pointer glass-card hover-glow transition-all duration-300 border-white/5 flex flex-col h-full"
             onClick={() => router.push(`/workspaces/${ws.id}`)}
           >
-            <CardHeader>
-              <CardTitle>{ws.name}</CardTitle>
+            <CardHeader className="pb-3 flex-row items-start justify-between space-y-0">
+              <div className="flex flex-col gap-1">
+                <div className="size-10 rounded-xl bg-gradient-to-br from-neutral-300 to-neutral-600 mb-2 opacity-50 shadow-inner" />
+                <CardTitle className="text-xl group-hover:text-white transition-colors">{ws.name}</CardTitle>
+              </div>
+              <Button variant="ghost" size="icon" className="size-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/5" onClick={(e) => e.stopPropagation()}>
+                <MoreVertical className="size-4" />
+              </Button>
             </CardHeader>
-            <CardContent className="text-gray-500 text-sm">
-              {ws.description || "No description"}
-              <div className="mt-2 text-xs text-gray-400">
-                Role: {ws.my_role || "Member"}
+            <CardContent className="flex-1 text-muted-foreground text-sm flex flex-col justify-between">
+              <p className="line-clamp-2 italic mb-4">
+                {ws.description || "No description provided. Click to add one."}
+              </p>
+              <div className="flex items-center justify-between text-[11px] text-neutral-500 font-medium uppercase tracking-wider">
+                <div className="flex items-center gap-2">
+                   <Users className="size-3" />
+                   {ws.my_role || "Member"}
+                </div>
+                <div className="flex items-center gap-2">
+                   <Clock className="size-3" />
+                   {new Date(ws.updated_at).toLocaleDateString()}
+                </div>
               </div>
             </CardContent>
           </Card>
         ))}
-        {workspaces.length === 0 && (
-          <p className="col-span-full text-center text-gray-500 py-8">
-            No workspaces yet. Create one to get started!
-          </p>
-        )}
       </div>
+      
+      {workspaces.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 bg-white/[0.01] border border-dashed border-white/5 rounded-3xl animate-in">
+           <LayoutGrid className="size-12 text-neutral-700 mb-4" />
+           <h3 className="text-xl font-medium text-neutral-300">No workspaces yet</h3>
+           <p className="text-neutral-500 mb-6">Create your first workspace to start collaborating.</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -150,6 +150,25 @@
     @apply fixed top-16 bottom-0 w-80 bg-background/40 backdrop-blur-2xl border-l border-white/5 z-50 transition-all duration-300;
     transition-timing-function: var(--ease-spring);
   }
+
+  .premium-gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-neutral-200 via-neutral-500 to-neutral-200;
+    background-size: 200% auto;
+    animation: shine 4s linear infinite;
+  }
+
+  .animate-in {
+    animation: animate-in 0.5s var(--ease-spring) forwards;
+  }
+
+  .hover-glow {
+    transition: all 0.3s ease;
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
 }
 
 @layer utilities {
@@ -159,5 +178,23 @@
 
   .bg-gradient-premium {
     background: radial-gradient(circle at top center, oklch(0.97 0 0), var(--background));
+  }
+}
+
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}
+
+@keyframes animate-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
