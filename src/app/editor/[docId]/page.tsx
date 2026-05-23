@@ -56,6 +56,10 @@ import {
   Plus,
   Undo2,
   ChevronDown,
+  GripVertical,
+  ChevronRight,
+  Settings,
+  Share2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -87,6 +91,8 @@ export default function EditorPage() {
   const [versionSummary, setVersionSummary] = useState("");
   const [isMajorVersion, setIsMajorVersion] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeSidebarTab, setActiveSidebarTab] = useState<"versions" | "members">("versions");
   const updateTimerRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   // Fetch current user + document + workspace context
@@ -553,282 +559,72 @@ export default function EditorPage() {
   // Main Render
   // ─────────────────────────────────────────────────────────────
 
+  // ─────────────────────────────────────────────────────────────
+  // Main Render
+  // ─────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background bg-gradient-premium selection:bg-primary/10">
       {/* Header */}
-      <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-5xl items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <Input
-              value={docTitle}
-              onChange={(e) => setDocTitle(e.target.value)}
-              onBlur={updateDocumentTitle}
-              onKeyDown={(e) => e.key === "Enter" && updateDocumentTitle()}
-              className="max-w-xs font-semibold text-lg border-0 focus-visible:ring-1"
-              disabled={loading}
-            />
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-white/5">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => router.push(`/workspaces/${workspaceId}`)}>
+              <ChevronRight className="h-5 w-5 rotate-180" />
+            </Button>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-2">
+              <Input
+                value={docTitle}
+                onChange={(e) => setDocTitle(e.target.value)}
+                onBlur={updateDocumentTitle}
+                onKeyDown={(e) => e.key === "Enter" && updateDocumentTitle()}
+                className="w-auto min-w-[200px] bg-transparent border-0 font-medium text-sm focus-visible:ring-0 px-0"
+                disabled={loading}
+              />
+              {loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Versions Dialog */}
-            <Dialog
-              open={isVersionDialogOpen}
-              onOpenChange={setIsVersionDialogOpen}
-            >
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <History className="mr-2 h-4 w-4" />
-                  Versions
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Version History</DialogTitle>
-                  <DialogDescription>
-                    Save snapshots or restore to a previous version.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4">
-                  {/* Create New Version */}
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="What changed? (optional)"
-                          value={versionSummary}
-                          onChange={(e) => setVersionSummary(e.target.value)}
-                          className="flex-1"
-                        />
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={isMajorVersion}
-                            onChange={(e) =>
-                              setIsMajorVersion(e.target.checked)
-                            }
-                          />
-                          Major version
-                        </label>
-                        <Button
-                          size="sm"
-                          onClick={createVersion}
-                          disabled={loading}
-                        >
-                          {loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Versions List */}
-                  <div className="max-h-64 overflow-y-auto space-y-2">
-                    {versions.map((v) => (
-                      <Card key={v.id} className="p-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">
-                              v{v.version_number}
-                              {v.is_major && (
-                                <Badge variant="secondary" className="ml-2">
-                                  Major
-                                </Badge>
-                              )}
-                            </div>
-                            {v.change_summary && (
-                              <p className="text-sm text-muted-foreground">
-                                {v.change_summary}
-                              </p>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(v.created_at).toLocaleString()} •{" "}
-                              {v.block_count} blocks
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => restoreVersion(v.id)}
-                            disabled={loading}
-                          >
-                            <Undo2 className="mr-2 h-4 w-4" />
-                            Restore
-                          </Button>
-                        </div>
-                      </Card>
-                    ))}
-                    {versions.length === 0 && (
-                      <p className="text-center text-muted-foreground py-4">
-                        No versions yet. Save your first snapshot above.
-                      </p>
-                    )}
-                  </div>
+          <div className="flex items-center gap-3">
+            {/* Collaborators */}
+            <div className="flex -space-x-2 mr-4">
+              {members.slice(0, 3).map((m) => (
+                <Avatar key={m.userId} className="h-8 w-8 border-2 border-background ring-2 ring-transparent hover:ring-primary/20 transition-all cursor-help">
+                  <AvatarFallback className="text-[10px] bg-secondary">
+                    {m.name?.[0] || m.email[0].toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+              {members.length > 3 && (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
+                  +{members.length - 3}
                 </div>
-              </DialogContent>
-            </Dialog>
+              )}
+            </div>
 
-            {/* Members Dialog */}
-            <Dialog
-              open={isMembersDialogOpen}
-              onOpenChange={setIsMembersDialogOpen}
+            <Button variant="outline" size="sm" className="rounded-full px-4 gap-2 border-primary/20 hover:bg-primary/5">
+              <Share2 className="h-4 w-4" />
+              Share
+            </Button>
+
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={isSidebarOpen ? "bg-accent" : ""}
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             >
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Users className="mr-2 h-4 w-4" />
-                  Members
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Workspace Members</DialogTitle>
-                  <DialogDescription>
-                    Invite collaborators or manage roles.
-                  </DialogDescription>
-                </DialogHeader>
+              <History className="h-5 w-5" />
+            </Button>
 
-                <div className="space-y-4">
-                  {/* Invite Form */}
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Email to invite"
-                          type="email"
-                          value={inviteEmail}
-                          onChange={(e) => setInviteEmail(e.target.value)}
-                          className="flex-1"
-                        />
-                        <Select
-                          value={inviteRole}
-                          onValueChange={(value) =>
-                            setInviteRole(value as WorkspaceMember["role"])
-                          }
-                        >
-                          <SelectTrigger className="w-28">
-                            <SelectValue placeholder="Role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="VIEWER">Viewer</SelectItem>
-                            <SelectItem value="MEMBER">Member</SelectItem>
-                            <SelectItem value="ADMIN">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="sm"
-                          onClick={inviteMember}
-                          disabled={loading || !inviteEmail.trim()}
-                        >
-                          {loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Plus className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Members List */}
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {members.map((m) => (
-                      <div
-                        key={m.userId}
-                        className="flex items-center justify-between p-2 rounded hover:bg-muted/50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src="" />
-                            <AvatarFallback>
-                              {m.name?.[0]?.toUpperCase() ||
-                                m.email[0].toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium text-sm">
-                              {m.name || m.email}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {m.email}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge className={getRoleColor(m.role)}>
-                            {m.role}
-                          </Badge>
-                          {currentUser?.role === "OWNER" &&
-                            m.userId !== currentUser.userId && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                  >
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      updateMemberRole(m.userId, "ADMIN")
-                                    }
-                                  >
-                                    Make Admin
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      updateMemberRole(m.userId, "MEMBER")
-                                    }
-                                  >
-                                    Make Member
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      updateMemberRole(m.userId, "VIEWER")
-                                    }
-                                  >
-                                    Make Viewer
-                                  </DropdownMenuItem>
-                                  <Separator className="my-1" />
-                                  <DropdownMenuItem
-                                    className="text-red-600"
-                                    onClick={() => removeMember(m.userId)}
-                                  >
-                                    Remove
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Document Actions */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-4 w-4" />
+                  <Settings className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={updateDocumentTitle}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Title
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-red-600"
-                  onClick={deleteDocument}
-                >
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem className="text-red-600" onClick={deleteDocument}>
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete Document
                 </DropdownMenuItem>
@@ -838,214 +634,259 @@ export default function EditorPage() {
         </div>
       </header>
 
-      {/* Editor Content */}
-      <main className="mx-auto max-w-3xl p-6">
-        <Tabs defaultValue="edit" className="mb-6">
-          <TabsList>
-            <TabsTrigger value="edit">Edit</TabsTrigger>
-            <TabsTrigger value="versions">
-              Versions ({versions.length})
-            </TabsTrigger>
-            <TabsTrigger value="members">
-              Members ({members.length})
-            </TabsTrigger>
-          </TabsList>
+      <div className="flex">
+        {/* Main Editor Canvas */}
+        <main className={`flex-1 transition-all duration-300 ease-in-out ${isSidebarOpen ? "mr-80" : ""}`}>
+          {/* Cover Image Area */}
+          <div className="h-64 w-full bg-muted relative group/cover overflow-hidden">
+             <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/20 opacity-0 group-hover/cover:opacity-100 transition-opacity" />
+             <div className="absolute right-8 bottom-4 opacity-0 group-hover/cover:opacity-100 transition-opacity flex gap-2">
+                <Button variant="secondary" size="sm" className="bg-background/80 backdrop-blur-md">Change Cover</Button>
+                <Button variant="secondary" size="sm" className="bg-background/80 backdrop-blur-md">Reposition</Button>
+             </div>
+          </div>
 
-          <TabsContent value="edit" className="space-y-4">
-            {/* Add Block Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full justify-start">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Block
-                  <ChevronDown className="ml-auto h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem onClick={() => addBlock("paragraph")}>
-                  Paragraph
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => addBlock("heading_1")}>
-                  Heading 1
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => addBlock("heading_2")}>
-                  Heading 2
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => addBlock("code")}>
-                  Code Block
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => addBlock("bullet_list")}>
-                  Bullet List
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => addBlock("quote")}>
-                  Quote
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => addBlock("divider")}>
-                  Divider
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="editor-canvas group/canvas relative">
+            {/* Canvas Header */}
+            <div className="mb-12">
+               <div className="flex items-center gap-2 text-muted-foreground mb-4 opacity-0 group-hover/canvas:opacity-100 transition-all -translate-x-2 group-hover/canvas:translate-x-0">
+                  <span className="text-xs font-medium uppercase tracking-widest">Document</span>
+                  <span className="text-xs">/</span>
+                  <span className="text-xs font-medium uppercase tracking-widest">{document?.workspace_id.slice(0, 8)}</span>
+               </div>
+               <Input
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                  onBlur={updateDocumentTitle}
+                  className="text-5xl font-bold tracking-tight bg-transparent border-0 h-auto p-0 focus-visible:ring-0 mb-4"
+                  placeholder="Untitled"
+               />
+               <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                     <Users className="h-4 w-4" />
+                     <span>{members.length} Collaborators</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <History className="h-4 w-4" />
+                     <span>Last edited {document ? new Date(document.updated_at).toLocaleDateString() : 'recently'}</span>
+                  </div>
+               </div>
+            </div>
 
-            {/* Blocks List */}
-            {blocks.map((block, index) => (
-              <Card key={block.id} className="group relative">
-                <CardContent className="p-4">
-                  {/* Block Header */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-mono">
-                        {getBlockIcon(block.type)}
-                      </span>
-                      <span>{block.type.replace("_", " ")}</span>
-                      <span>•</span>
-                      <span>Position {block.position}</span>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => moveBlock(block.id, "up")}
-                        disabled={index === 0}
-                      >
-                        ↑
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => moveBlock(block.id, "down")}
-                        disabled={index === blocks.length - 1}
-                      >
-                        ↓
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-600"
-                        onClick={() => deleteBlock(block.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+            {/* Add Block Command (Notion style) */}
+            <div className="absolute -left-12 top-0 opacity-0 group-hover/canvas:opacity-100 transition-opacity">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background shadow-sm border">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56 p-2">
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Basic Blocks</div>
+                  <DropdownMenuItem onClick={() => addBlock("paragraph")} className="gap-2 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded bg-blue-100 text-blue-600 font-mono text-xs">¶</span>
+                    Text
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addBlock("heading_1")} className="gap-2 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded bg-red-100 text-red-600 font-bold text-xs">H1</span>
+                    Heading 1
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addBlock("heading_2")} className="gap-2 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded bg-orange-100 text-orange-600 font-bold text-xs">H2</span>
+                    Heading 2
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addBlock("code")} className="gap-2 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-gray-600 font-mono text-xs">{"</>"}</span>
+                    Code
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addBlock("bullet_list")} className="gap-2 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded bg-green-100 text-green-600 text-xs">•</span>
+                    Bullet List
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="space-y-1">
+              {blocks.map((block, index) => (
+                <div key={block.id} className="group relative py-1 focus-within:bg-accent/5 rounded-lg -mx-4 px-4 transition-colors">
+                  {/* Block Hover Drag Handle */}
+                  <div className="block-handle group-hover:opacity-100">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <GripVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={() => moveBlock(block.id, "up")} disabled={index === 0}>Move Up</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => moveBlock(block.id, "down")} disabled={index === blocks.length - 1}>Move Down</DropdownMenuItem>
+                        <Separator className="my-1" />
+                        <DropdownMenuItem className="text-red-600" onClick={() => deleteBlock(block.id)}>Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
                   {/* Block Content */}
-                  {block.type === "code" ? (
-                    <textarea
-                      className="w-full min-h-[120px] font-mono text-sm p-3 bg-muted rounded border-0 focus:ring-1 focus:ring-primary"
-                      value={
-                        typeof block.content === "string" ? block.content : ""
-                      }
-                      onChange={(e) => updateBlock(block, e.target.value)}
-                      placeholder="Enter code..."
-                    />
-                  ) : block.type === "divider" ? (
-                    <Separator className="my-4" />
-                  ) : (
-                    <Input
-                      className={`w-full border-0 p-0 text-lg focus-visible:ring-0 ${
-                        block.type.startsWith("heading") ? "font-bold" : ""
-                      } ${block.type === "quote" ? "border-l-4 pl-4 italic" : ""}`}
-                      value={
-                        typeof block.content === "string" ? block.content : ""
-                      }
-                      onChange={(e) => updateBlock(block, e.target.value)}
-                      placeholder={
-                        block.type === "heading_1"
-                          ? "Heading 1"
-                          : block.type === "heading_2"
-                            ? "Heading 2"
-                            : "Start typing..."
-                      }
-                    />
-                  )}
-
-                  {/* Last Edited */}
-                  {block.last_edited_by_id &&
-                    block.last_edited_by_id !== currentUser?.userId && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Last edited by collaborator
-                      </p>
+                  <div className="w-full">
+                    {block.type === "code" ? (
+                      <div className="relative my-4">
+                        <div className="absolute right-4 top-4 text-[10px] font-mono text-muted-foreground uppercase opacity-0 group-hover:opacity-100 transition-opacity">Code</div>
+                        <textarea
+                          className="w-full min-h-[140px] font-mono text-sm p-6 bg-secondary/50 rounded-xl border border-white/5 focus:ring-1 focus:ring-primary/20 backdrop-blur-sm"
+                          value={typeof block.content === "string" ? block.content : ""}
+                          onChange={(e) => updateBlock(block, e.target.value)}
+                          placeholder="Write some code..."
+                        />
+                      </div>
+                    ) : block.type === "divider" ? (
+                      <div className="py-6">
+                        <Separator className="bg-gradient-to-r from-transparent via-border to-transparent h-[1px]" />
+                      </div>
+                    ) : (
+                      <textarea
+                        rows={1}
+                        className={`premium-input w-full ${
+                          block.type === "heading_1" ? "text-4xl font-bold tracking-tight mb-2" :
+                          block.type === "heading_2" ? "text-2xl font-semibold tracking-tight mb-1" :
+                          block.type === "heading_3" ? "text-xl font-semibold mb-1" :
+                          block.type === "quote" ? "border-l-2 border-primary/30 pl-4 py-1 italic text-muted-foreground text-lg" :
+                          "text-lg leading-relaxed pt-1"
+                        }`}
+                        value={typeof block.content === "string" ? block.content : ""}
+                        onChange={(e) => {
+                          updateBlock(block, e.target.value);
+                          e.target.style.height = "auto";
+                          e.target.style.height = e.target.scrollHeight + "px";
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.height = "auto";
+                          e.target.style.height = e.target.scrollHeight + "px";
+                        }}
+                        placeholder={
+                          block.type.startsWith("heading") ? "Heading" : "Type '/' for commands..."
+                        }
+                      />
                     )}
-                </CardContent>
-              </Card>
-            ))}
+                  </div>
+                  
+                  {/* Collaborator Pulse */}
+                  {block.last_edited_by_id && block.last_edited_by_id !== currentUser?.userId && (
+                    <div className="absolute -right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                       <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
 
             {blocks.length === 0 && (
-              <Card className="p-8 text-center">
-                <p className="text-muted-foreground">
-                  No blocks yet. Click "Add Block" above to start writing.
-                </p>
-              </Card>
+              <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-40">
+                <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center">
+                  <Plus className="h-8 w-8" />
+                </div>
+                <div>
+                  <p className="text-xl font-medium">Your canvas is blank</p>
+                  <p className="text-sm">Start typing or add a block to begin your story.</p>
+                </div>
+              </div>
             )}
-          </TabsContent>
+          </div>
+        </main>
 
-          <TabsContent value="versions">
-            {/* Reuse version dialog content or show inline list */}
-            <div className="space-y-3">
-              {versions.map((v) => (
-                <Card key={v.id} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">
-                        v{v.version_number}
-                        {v.is_major && (
-                          <Badge variant="secondary" className="ml-2">
-                            Major
-                          </Badge>
-                        )}
-                      </div>
-                      {v.change_summary && (
-                        <p className="text-sm text-muted-foreground">
-                          {v.change_summary}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(v.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => restoreVersion(v.id)}
-                    >
-                      <Undo2 className="mr-2 h-4 w-4" />
-                      Restore
+        {/* Sidebar */}
+        <div className={`sidebar-glass ${isSidebarOpen ? "right-0" : "-right-80 shadow-none"}`}>
+          <div className="p-6 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setActiveSidebarTab("versions")}
+                  className={`text-sm font-semibold transition-colors ${activeSidebarTab === "versions" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  History
+                </button>
+                <button 
+                  onClick={() => setActiveSidebarTab("members")}
+                  className={`text-sm font-semibold transition-colors ${activeSidebarTab === "members" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  Members
+                </button>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSidebarOpen(false)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {activeSidebarTab === "versions" ? (
+                <div className="space-y-6">
+                  {/* Create Version */}
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 mb-6">
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-3">Snapshot</p>
+                    <Input
+                      placeholder="Summary..."
+                      value={versionSummary}
+                      onChange={(e) => setVersionSummary(e.target.value)}
+                      className="bg-background/50 border-white/5 text-sm mb-3"
+                    />
+                    <Button size="sm" className="w-full rounded-lg" onClick={createVersion} disabled={loading}>
+                      Save Version
                     </Button>
                   </div>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
 
-          <TabsContent value="members">
-            <div className="space-y-3">
-              {members.map((m) => (
-                <Card key={m.userId} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>
-                          {m.name?.[0]?.toUpperCase() ||
-                            m.email[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{m.name || m.email}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {m.email}
-                        </p>
-                      </div>
+                  {versions.map((v) => (
+                    <div key={v.id} className="group relative pl-4 border-l border-border hover:border-primary transition-colors pb-6">
+                      <div className="absolute -left-1.5 top-1 h-3 w-3 rounded-full border-2 border-background bg-border group-hover:bg-primary transition-colors" />
+                      <p className="text-sm font-bold">Version {v.version_number}</p>
+                      <p className="text-xs text-muted-foreground mb-2">{v.change_summary || "Automated snapshot"}</p>
+                      <p className="text-[10px] text-muted-foreground italic mb-3">{new Date(v.created_at).toLocaleDateString()}</p>
+                      <Button variant="secondary" size="sm" className="h-7 text-[10px] rounded-md opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => restoreVersion(v.id)}>
+                        Restore
+                      </Button>
                     </div>
-                    <Badge className={getRoleColor(m.role)}>{m.role}</Badge>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                   <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 mb-6">
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-3">Invite Collaborator</p>
+                    <div className="flex gap-2">
+                       <Input
+                        placeholder="Email..."
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        className="bg-background/50 border-white/5 text-sm"
+                      />
+                      <Button size="sm" onClick={inviteMember} disabled={loading} className="px-3">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </Card>
-              ))}
+
+                  {members.map((m) => (
+                    <div key={m.userId} className="flex items-center justify-between group">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-[10px]">{m.name?.[0] || m.email[0].toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-xs font-semibold">{m.name || m.email}</p>
+                          <p className="text-[10px] text-muted-foreground">{m.role}</p>
+                        </div>
+                      </div>
+                      {currentUser?.role === "OWNER" && m.userId !== currentUser.userId && (
+                         <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => removeMember(m.userId)}>
+                            <Trash2 className="h-3 w-3 text-red-500" />
+                         </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
