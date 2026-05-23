@@ -1,26 +1,41 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { Workspace } from "@/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { workspaceAPI } from "@/lib/api";
+import type { Workspace } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import toast from "react-hot-toast";
 
 export default function DashboardPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [newName, setNewName] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const fetchWorkspaces = async () => {
-    const { data } = await api.get("/workspaces");
-    setWorkspaces(data);
+    try {
+      const { data } = await workspaceAPI.list();
+      setWorkspaces(data);
+    } catch {
+      toast.error("Failed to load workspaces");
+    }
   };
 
   const createWorkspace = async () => {
     if (!newName.trim()) return;
-    await api.post("/workspaces", { name: newName });
-    setNewName("");
-    fetchWorkspaces();
+    setLoading(true);
+    try {
+      await workspaceAPI.create({ name: newName });
+      setNewName("");
+      await fetchWorkspaces();
+      toast.success("Workspace created");
+    } catch {
+      toast.error("Failed to create workspace");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -29,16 +44,23 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Your Workspaces</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Your Workspaces</h1>
+        <Button onClick={() => router.refresh()}>↻ Refresh</Button>
+      </div>
+
       <div className="flex gap-2 mb-8">
-        <input
-          className="border px-3 py-2 rounded flex-1"
+        <Input
           placeholder="New workspace name"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && createWorkspace()}
         />
-        <Button onClick={createWorkspace}>Create</Button>
+        <Button onClick={createWorkspace} disabled={loading || !newName.trim()}>
+          {loading ? "Creating..." : "Create"}
+        </Button>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {workspaces.map((ws) => (
           <Card
@@ -51,9 +73,17 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="text-gray-500 text-sm">
               {ws.description || "No description"}
+              <div className="mt-2 text-xs text-gray-400">
+                Role: {ws.my_role || "Member"}
+              </div>
             </CardContent>
           </Card>
         ))}
+        {workspaces.length === 0 && (
+          <p className="col-span-full text-center text-gray-500 py-8">
+            No workspaces yet. Create one to get started!
+          </p>
+        )}
       </div>
     </div>
   );

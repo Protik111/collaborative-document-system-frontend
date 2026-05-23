@@ -1,42 +1,69 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { Document } from "@/types";
+import { documentAPI, workspaceAPI } from "@/lib/api";
+import type { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import toast from "react-hot-toast";
 
 export default function WorkspacePage() {
   const { id } = useParams();
   const router = useRouter();
   const [docs, setDocs] = useState<Document[]>([]);
   const [title, setTitle] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    api.get(`/workspaces/${id}/documents`).then((res) => setDocs(res.data));
-  }, [id]);
+  const fetchDocs = async () => {
+    try {
+      const { data } = await documentAPI.list(id as string);
+      setDocs(data);
+    } catch {
+      toast.error("Failed to load documents");
+    }
+  };
 
   const createDoc = async () => {
-    await api.post(`/workspaces/${id}/documents`, { title });
-    setTitle("");
-    const res = await api.get(`/workspaces/${id}/documents`);
-    setDocs(res.data);
+    if (!title.trim()) return;
+    setLoading(true);
+    try {
+      await documentAPI.create(id as string, { title });
+      setTitle("");
+      await fetchDocs();
+      toast.success("Document created");
+    } catch {
+      toast.error("Failed to create document");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchDocs();
+  }, [id]);
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Documents</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Documents</h1>
+        <Button variant="outline" onClick={() => router.back()}>
+          ← Back
+        </Button>
+      </div>
+
       <div className="flex gap-2 mb-6">
-        <input
-          className="border px-3 py-2 rounded flex-1"
+        <Input
           placeholder="Document title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && createDoc()}
         />
-        <Button onClick={createDoc} disabled={!title.trim()}>
-          Create
+        <Button onClick={createDoc} disabled={loading || !title.trim()}>
+          {loading ? "Creating..." : "Create"}
         </Button>
       </div>
+
       <div className="space-y-3">
         {docs.map((doc) => (
           <Card
@@ -44,9 +71,19 @@ export default function WorkspacePage() {
             className="hover:bg-gray-50 cursor-pointer"
             onClick={() => router.push(`/editor/${doc.id}`)}
           >
-            <CardContent className="py-4">{doc.title}</CardContent>
+            <CardContent className="py-4 flex justify-between items-center">
+              <span className="font-medium">{doc.title}</span>
+              <span className="text-xs text-gray-400">
+                {new Date(doc.updated_at).toLocaleDateString()}
+              </span>
+            </CardContent>
           </Card>
         ))}
+        {docs.length === 0 && (
+          <p className="text-center text-gray-500 py-8">
+            No documents yet. Create one to start collaborating.
+          </p>
+        )}
       </div>
     </div>
   );
