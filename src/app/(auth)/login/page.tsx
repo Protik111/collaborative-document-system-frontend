@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import toast from "react-hot-toast";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("david3@test.com");
+  const [password, setPassword] = useState("pass12345");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 

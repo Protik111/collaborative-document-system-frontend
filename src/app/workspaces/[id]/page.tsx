@@ -17,8 +17,21 @@ export default function WorkspacePage() {
 
   const fetchDocs = async () => {
     try {
-      const { data } = await documentAPI.list(id as string);
-      setDocs(data);
+      const res = await documentAPI.list(id as string);
+      const data = res.data;
+
+      // API may return the documents array directly or wrapped in an object.
+      if (Array.isArray(data)) {
+        setDocs(data);
+      } else if (Array.isArray((data as any)?.documents)) {
+        setDocs((data as any).documents);
+      } else if (Array.isArray((data as any)?.data)) {
+        setDocs((data as any).data);
+      } else {
+        // Fallback: ensure `docs` is always an array to avoid `map` errors.
+        console.warn("Unexpected documents response shape:", data);
+        setDocs([]);
+      }
     } catch {
       toast.error("Failed to load documents");
     }

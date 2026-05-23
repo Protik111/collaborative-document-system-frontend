@@ -1,7 +1,7 @@
 export interface User {
-  id: string;
+  userId: string;
   email: string;
-  name: string;
+  name?: string;
   created_at?: string;
 }
 
@@ -25,9 +25,20 @@ export interface Document {
   updated_at: string;
 }
 
+export type BlockType =
+  | "paragraph"
+  | "heading_1"
+  | "heading_2"
+  | "heading_3"
+  | "code"
+  | "bullet_list"
+  | "numbered_list"
+  | "quote"
+  | "divider";
+
 export interface Block {
   id: string;
-  type: "paragraph" | "heading_1" | "heading_2" | "code" | "list" | string;
+  type: BlockType;
   content: any;
   position: number;
   document_id: string;
@@ -44,4 +55,12 @@ export interface Version {
   created_by: string | null;
   created_at: string;
   block_count: number;
+}
+
+export interface WorkspaceMember {
+  userId: string;
+  email: string;
+  name: string | null;
+  role: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
+  joined_at?: string;
 }

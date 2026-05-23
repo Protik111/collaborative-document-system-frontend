@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { User, Workspace, Document, Block, Version } from "@/types";
+import type { User, Workspace, Document, Block, Version, WorkspaceMember } from "@/types";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1",
@@ -54,16 +54,24 @@ export const workspaceAPI = {
   remove: (id: string) => api.delete(`/workspace/${id}`),
 
   // Membership
-  invite: (workspaceId: string, data: { email: string; role: string }) =>
-    api.post(`/workspaces/${workspaceId}/invite`, data),
+  invite: (
+    workspaceId: string,
+    data: { email: string; role: WorkspaceMember["role"] },
+  ) => api.post(`/workspace/${workspaceId}/invite`, data),
   listMembers: (workspaceId: string) =>
-    api.get(`/workspaces/${workspaceId}/members`),
+    api.get<WorkspaceMember[]>(`/workspace/${workspaceId}/members`),
   getMember: (workspaceId: string, userId: string) =>
-    api.get(`/workspaces/${workspaceId}/members/${userId}`),
-  updateMember: (workspaceId: string, userId: string, role: string) =>
-    api.patch(`/workspaces/${workspaceId}/members/${userId}`, { role }),
+    api.get<WorkspaceMember>(`/workspace/${workspaceId}/members/${userId}`),
+  updateMember: (
+    workspaceId: string,
+    userId: string,
+    role: WorkspaceMember["role"],
+  ) =>
+    api.patch<WorkspaceMember>(`/workspace/${workspaceId}/members/${userId}`, {
+      role,
+    }),
   removeMember: (workspaceId: string, userId: string) =>
-    api.delete(`/workspaces/${workspaceId}/members/${userId}`),
+    api.delete(`/workspace/${workspaceId}/members/${userId}`),
 };
 
 // Document
