@@ -61,6 +61,7 @@ import {
   Settings,
   Share2,
   Clock,
+  Shield,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -860,18 +861,14 @@ export default function EditorPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                   <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 mb-6">
-                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-3">Invite Collaborator</p>
-                    <div className="flex gap-2">
-                       <Input
-                        placeholder="Email..."
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        className="bg-background/50 border-white/5 text-sm"
-                      />
-                      <Button size="sm" onClick={inviteMember} disabled={loading} className="px-3">
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                   {/* Info card pointing to workspace page */}
+                   <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/15 mb-2">
+                    <div className="flex items-start gap-2.5">
+                      <Shield className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-blue-300 mb-1">Manage members from the Workspace page</p>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">To invite or remove collaborators, go back to the workspace.</p>
+                      </div>
                     </div>
                   </div>
 
@@ -886,11 +883,6 @@ export default function EditorPage() {
                           <p className="text-[10px] text-muted-foreground">{m.role}</p>
                         </div>
                       </div>
-                      {currentUser?.role === "OWNER" && m.userId !== currentUser.userId && (
-                         <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => removeMember(m.userId)}>
-                            <Trash2 className="h-3 w-3 text-red-500" />
-                         </Button>
-                      )}
                     </div>
                   ))}
                 </div>
