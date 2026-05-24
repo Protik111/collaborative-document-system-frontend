@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { documentAPI, workspaceAPI } from "@/lib/api";
+import { documentAPI, workspaceAPI, authAPI } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { Document, WorkspaceMember } from "@/types";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,18 +41,38 @@ export default function WorkspacePage() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<WorkspaceMember["role"]>("MEMBER");
+  const [currentUser, setCurrentUser] = useState<{ userId: string; email: string } | null>(null);
+  
+  // Confirmation Modal state
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<{ userId: string; isLeaving: boolean } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [docsRes, wsRes, membersRes] = await Promise.all([
+      const [docsRes, wsRes, membersRes, meRes] = await Promise.all([
         documentAPI.list(id as string),
         workspaceAPI.get(id as string),
         workspaceAPI.listMembers(id as string),
+        authAPI.me(),
       ]);
       
       const data = docsRes.data;
       setWorkspace(wsRes.data);
-      setMembers(membersRes.data);
+      
+      // Map members to ensure userId is present (handle user_id or id from backend)
+      const mappedMembers = (membersRes.data || []).map((m: any) => ({
+        ...m,
+        userId: m.userId || m.user_id || m.id
+      }));
+      setMembers(mappedMembers);
+
+      // Handle current user ID mapping
+      const me = meRes.data.user as any;
+      setCurrentUser({ 
+        userId: me.userId || me.user_id || me.id, 
+        email: me.email 
+      });
 
       if (Array.isArray(data)) {
         setDocs(data);
@@ -101,14 +122,29 @@ export default function WorkspacePage() {
     }
   };
 
-  const removeMember = async (userId: string) => {
-    if (!confirm("Remove this member from the workspace?")) return;
+  const removeMember = async (userId: string, isLeaving = false) => {
+    setConfirmData({ userId, isLeaving });
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!confirmData) return;
+    const { userId, isLeaving } = confirmData;
+    setConfirmLoading(true);
     try {
       await workspaceAPI.removeMember(id as string, userId);
-      setMembers((prev) => prev.filter((m) => m.userId !== userId));
-      toast.success("Member removed");
+      if (isLeaving) {
+        toast.success("You left the workspace");
+        router.push("/dashboard");
+      } else {
+        setMembers((prev) => prev.filter((m) => m.userId !== userId));
+        toast.success("Member removed");
+        setIsConfirmOpen(false);
+      }
     } catch {
-      toast.error("Failed to remove member");
+      toast.error(isLeaving ? "Failed to leave workspace" : "Failed to remove member");
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
@@ -342,22 +378,51 @@ export default function WorkspacePage() {
                   <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${roleColors[m.role] || roleColors.VIEWER}`}>
                     {m.role}
                   </span>
-                  {workspace?.my_role === "OWNER" && m.role !== "OWNER" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 text-red-400"
-                      onClick={() => removeMember(m.userId)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  )}
+                  
+                  {/* Remove Member (for Owners) / Leave Workspace (for self) */}
+                  <div className="flex items-center gap-1">
+                    {currentUser?.userId === m.userId && m.role !== "OWNER" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-[10px] font-bold uppercase tracking-wider text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg px-3"
+                        onClick={() => removeMember(m.userId, true)}
+                      >
+                        Leave
+                      </Button>
+                    )}
+
+                    {workspace?.my_role === "OWNER" && m.role !== "OWNER" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 text-red-400"
+                        onClick={() => removeMember(m.userId)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmRemove}
+        isLoading={confirmLoading}
+        title={confirmData?.isLeaving ? "Leave Workspace" : "Remove Member"}
+        description={confirmData?.isLeaving 
+          ? "Are you sure you want to leave this workspace? You will lose access to all documents within it." 
+          : "Are you sure you want to remove this member? They will no longer be able to access this workspace."
+        }
+        confirmText={confirmData?.isLeaving ? "Leave" : "Remove"}
+        variant="destructive"
+      />
     </div>
   );
 }

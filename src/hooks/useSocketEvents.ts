@@ -4,8 +4,8 @@ import toast from "react-hot-toast";
 
 export const useSocketEvents = () => {
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+    let socket = getSocket();
+    let attached = false;
 
     const handleInviteAccepted = (payload: {
       workspaceName: string;
@@ -13,17 +13,39 @@ export const useSocketEvents = () => {
     }) => {
       toast.success(
         `You have been invited to "${payload.workspaceName}" as ${payload.role}!`,
-        {
-          duration: 5000,
-          icon: "🎉",
-        },
+        { duration: 5000, icon: "🎉" },
       );
     };
 
-    socket.on("workspace_invite_accepted", handleInviteAccepted);
+    const attachListeners = (s: any) => {
+      if (attached) return;
+      s.on("workspace_invite_accepted", handleInviteAccepted);
+      attached = true;
+    };
+
+    // If socket exists, attach immediately
+    if (socket) {
+      attachListeners(socket);
+    }
+
+    // Also poll for a few seconds in case it's being connected asynchronously
+    const interval = setInterval(() => {
+      socket = getSocket();
+      if (socket) {
+        attachListeners(socket);
+        clearInterval(interval);
+      }
+    }, 500);
+
+    // Stop polling after 10 seconds to avoid memory leaks
+    const timeout = setTimeout(() => clearInterval(interval), 10000);
 
     return () => {
-      socket.off("workspace_invite_accepted", handleInviteAccepted);
+      clearInterval(interval);
+      clearTimeout(timeout);
+      if (socket) {
+        socket.off("workspace_invite_accepted", handleInviteAccepted);
+      }
     };
   }, []);
 };

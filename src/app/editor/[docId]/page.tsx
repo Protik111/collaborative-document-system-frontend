@@ -10,7 +10,7 @@ import {
   authAPI,
 } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import type { Block, BlockType, Document, Version, WorkspaceMember } from "@/types";
+import type { Block, BlockType, Document, User, Version, WorkspaceMember } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { Separator } from "@/components/ui/separator";
 import {
   Loader2,
@@ -82,9 +83,8 @@ export default function EditorPage() {
     email: string;
     role?: string;
   } | null>(null);
-  const [activeCollaborators, setActiveCollaborators] = useState<
-    { userId: string; email: string }[]
-  >([]);
+  const [activeCollaborators, setActiveCollaborators] = useState<User[]>([]);
+  const [blockFocus, setBlockFocus] = useState<Record<string, { email: string; color: string }>>({});
 
   // UI State
   const [loading, setLoading] = useState(false);
@@ -96,8 +96,14 @@ export default function EditorPage() {
   const [versionSummary, setVersionSummary] = useState("");
   const [isMajorVersion, setIsMajorVersion] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeSidebarTab, setActiveSidebarTab] = useState<"versions" | "members">("versions");
+  
+  // Confirmation Modal state
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  
   const updateTimerRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   // Fetch current user + document + workspace context
@@ -106,9 +112,10 @@ export default function EditorPage() {
       try {
         // Get current user from token
         const { data: me } = await authAPI.me();
+        const userData = (me as any).user;
         setCurrentUser({
-          userId: me.user.userId,
-          email: me.user.email,
+          userId: userData.userId || userData.user_id || userData.id,
+          email: userData.email,
         });
 
         // Find which workspace contains this document
@@ -158,7 +165,13 @@ export default function EditorPage() {
           blocksRes.data.sort((a: Block, b: Block) => a.position - b.position),
         );
         setVersions(versionsRes.data);
-        setMembers(membersRes.data);
+        
+        // Map members to ensure userId is present (handle user_id or id from backend)
+        const mappedMembers = (membersRes.data || []).map((m: any) => ({
+          ...m,
+          userId: m.userId || m.user_id || m.id
+        }));
+        setMembers(mappedMembers);
       } catch {
         toast.error("Failed to load document data");
       }
@@ -167,7 +180,7 @@ export default function EditorPage() {
 
     // Setup WebSocket
     const socket = getSocket();
-    socket?.emit("join_document", { documentId: docId });
+    socket?.emit("join_document", { docId, documentId: docId });
 
     const handleBlockUpdate = ({
       blockId,
@@ -185,13 +198,41 @@ export default function EditorPage() {
       toast.success("Live update received");
     };
 
-    const handleUserJoined = ({ userId, email }: { userId: string; email: string }) => {
-      setActiveCollaborators((prev) => {
-        if (prev.some((u) => u.userId === userId)) return prev;
-        return [...prev, { userId, email }];
+    socket?.on("active_users", (users: User[]) => {
+        setActiveCollaborators(users);
       });
-      toast(`${email} is now viewing`, { icon: "👁️" });
+
+      socket?.on("presence_update", ({ userId, email, blockId }: { userId: string; email: string; blockId: string | null }) => {
+        setBlockFocus((prev) => {
+          const newState = { ...prev };
+          // Remove old focus for this user
+          Object.keys(newState).forEach(key => {
+            if (newState[key].email === email) delete newState[key];
+          });
+          // Add new focus if applicable
+          if (blockId) {
+            const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+            const colorIndex = email.length % colors.length;
+            newState[blockId] = { email, color: colors[colorIndex] };
+          }
+          return newState;
+        });
+      });
+
+    const handleUserJoined = (user: User) => {
+      setActiveCollaborators((prev) => {
+        if (prev.some((u) => u.userId === user.userId)) return prev;
+        return [...prev, user];
+      });
+      toast.success(`${user.name || user.email} joined focus`, { icon: "👋" });
     };
+
+    const handleUserLeft = (userId: string) => {
+      setActiveCollaborators((prev) => prev.filter((u) => u.userId !== userId));
+    };
+
+    socket?.on("user_joined", handleUserJoined);
+    socket?.on("user_left", handleUserLeft);
 
     const handleBlockAdded = ({ block }: { block: Block }) => {
       setBlocks((prev) =>
@@ -225,18 +266,20 @@ export default function EditorPage() {
     socket?.on("block_added", handleBlockAdded);
     socket?.on("block_deleted", handleBlockDeleted);
     socket?.on("block_moved", handleBlockMoved);
-    socket?.on("user_joined", handleUserJoined);
 
     return () => {
-      socket?.emit("leave_document", { documentId: docId });
+      socket?.emit("leave_document", { docId, documentId: docId });
       socket?.off("block_updated", handleBlockUpdate);
       socket?.off("block_added", handleBlockAdded);
       socket?.off("block_deleted", handleBlockDeleted);
       socket?.off("block_moved", handleBlockMoved);
+      socket?.off("active_users");
+      socket?.off("presence_update");
       socket?.off("user_joined", handleUserJoined);
+      socket?.off("user_left", handleUserLeft);
 
       // Clear all pending update timers
-      Object.values(updateTimerRef.current).forEach(clearTimeout);
+      Object.values(updateTimerRef.current).forEach((timer) => clearTimeout(timer));
     };
   }, [workspaceId, docId, currentUser?.userId]);
 
@@ -298,6 +341,7 @@ export default function EditorPage() {
         );
         // Broadcast to others
         getSocket()?.emit("block_add", {
+          docId,
           documentId: docId,
           block: data,
         });
@@ -311,42 +355,40 @@ export default function EditorPage() {
     [workspaceId, docId, blocks],
   );
 
-  const updateBlock = useCallback(
-    async (block: Block, newContent: any) => {
-      if (!workspaceId) return;
+  const updateBlock = async (id: string, content: any) => {
+    // Also update focus locally
+    const socket = getSocket();
+    if (socket && workspaceId) {
+      socket.emit("presence_update", { docId, documentId: docId, blockId: id });
+    }
+    
+    setBlocks((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, content } : b)),
+    );
 
-      // Optimistic update
-      setBlocks((prev) =>
-        prev.map((b) =>
-          b.id === block.id ? { ...b, content: newContent } : b,
-        ),
-      );
+    // Debounce API call and Broadcast
+    if (updateTimerRef.current[id]) {
+      clearTimeout(updateTimerRef.current[id]);
+    }
 
-      // Debounce API call and Broadcast
-      if (updateTimerRef.current[block.id]) {
-        clearTimeout(updateTimerRef.current[block.id]);
+    updateTimerRef.current[id] = setTimeout(async () => {
+      try {
+        await blockAPI.update(workspaceId!, docId as string, id, {
+          content: content,
+        });
+        // Broadcast to others
+        getSocket()?.emit("block_update", {
+          docId,
+          documentId: docId,
+          blockId: id,
+          content: content,
+          updatedBy: currentUser?.userId
+        });
+      } catch {
+        toast.error("Failed to save block");
       }
-
-      updateTimerRef.current[block.id] = setTimeout(async () => {
-        try {
-          await blockAPI.update(workspaceId, docId as string, block.id, {
-            content: newContent,
-          });
-          // Broadcast to others
-          getSocket()?.emit("block_update", {
-            documentId: docId,
-            blockId: block.id,
-            content: newContent,
-          });
-        } catch {
-          toast.error("Failed to save block");
-          // Not reverting optimistic update here for better UX, 
-          // but in production we might want to flag the block as "unsaved"
-        }
-      }, 500);
-    },
-    [workspaceId, docId],
-  );
+    }, 500);
+  };
 
   const deleteBlock = useCallback(
     async (blockId: string) => {
@@ -358,6 +400,7 @@ export default function EditorPage() {
         setBlocks((prev) => prev.filter((b) => b.id !== blockId));
         // Broadcast to others
         getSocket()?.emit("block_delete", {
+          docId,
           documentId: docId,
           blockId,
         });
@@ -404,12 +447,12 @@ export default function EditorPage() {
         ]);
         // Broadcast to others
         getSocket()?.emit("block_move", {
+          docId,
           documentId: docId,
           blocks: [newBlocks[index], newBlocks[newIndex]],
         });
       } catch {
         toast.error("Failed to reorder blocks");
-        // Could revert here, but keeping it simple for MVP
       }
     },
     [workspaceId, docId, blocks],
@@ -509,18 +552,26 @@ export default function EditorPage() {
 
   const removeMember = useCallback(
     async (userId: string) => {
-      if (!workspaceId) return;
-      if (!confirm("Remove this member from the workspace?")) return;
-      try {
-        await workspaceAPI.removeMember(workspaceId, userId);
-        setMembers((prev) => prev.filter((m) => m.userId !== userId));
-        toast.success("Member removed");
-      } catch {
-        toast.error("Failed to remove member");
-      }
+      setMemberToRemove(userId);
+      setIsConfirmOpen(true);
     },
-    [workspaceId],
+    [],
   );
+
+  const handleConfirmRemove = async () => {
+    if (!memberToRemove || !workspaceId) return;
+    setConfirmLoading(true);
+    try {
+      await workspaceAPI.removeMember(workspaceId, memberToRemove);
+      setMembers((prev) => prev.filter((m) => m.userId !== memberToRemove));
+      toast.success("Member removed");
+      setIsConfirmOpen(false);
+    } catch {
+      toast.error("Failed to remove member");
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
 
   // ─────────────────────────────────────────────────────────────
   // Render Helpers
@@ -563,10 +614,6 @@ export default function EditorPage() {
       </div>
     );
   }
-
-  // ─────────────────────────────────────────────────────────────
-  // Main Render
-  // ─────────────────────────────────────────────────────────────
 
   // ─────────────────────────────────────────────────────────────
   // Main Render
@@ -765,9 +812,9 @@ export default function EditorPage() {
                       <div className="relative my-4">
                         <div className="absolute right-4 top-4 text-[10px] font-mono text-muted-foreground uppercase opacity-0 group-hover:opacity-100 transition-opacity">Code</div>
                         <textarea
+                          value={block.content || ""}
+                          onChange={(e) => updateBlock(block.id, e.target.value)}
                           className="w-full min-h-[140px] font-mono text-sm p-6 bg-secondary/50 rounded-xl border border-white/5 focus:ring-1 focus:ring-primary/20 backdrop-blur-sm"
-                          value={typeof block.content === "string" ? block.content : ""}
-                          onChange={(e) => updateBlock(block, e.target.value)}
                           placeholder="Write some code..."
                         />
                       </div>
@@ -787,7 +834,7 @@ export default function EditorPage() {
                         }`}
                         value={typeof block.content === "string" ? block.content : ""}
                         onChange={(e) => {
-                          updateBlock(block, e.target.value);
+                          updateBlock(block.id, e.target.value);
                           e.target.style.height = "auto";
                           e.target.style.height = e.target.scrollHeight + "px";
                         }}
@@ -902,6 +949,16 @@ export default function EditorPage() {
                           <p className="text-[10px] text-muted-foreground">{m.role}</p>
                         </div>
                       </div>
+                      {currentUser?.role === "OWNER" && m.userId !== currentUser.userId && (
+                         <Button 
+                           variant="ghost" 
+                           size="icon" 
+                           className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-red-400 transition-all" 
+                           onClick={() => removeMember(m.userId)}
+                         >
+                            <Trash2 className="h-3.5 w-3.5" />
+                         </Button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -910,6 +967,17 @@ export default function EditorPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmRemove}
+        isLoading={confirmLoading}
+        title="Remove Member"
+        description="Are you sure you want to remove this member? They will no longer be able to access this workspace."
+        confirmText="Remove"
+        variant="destructive"
+      />
     </div>
   );
 }
