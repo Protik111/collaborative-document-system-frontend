@@ -5,15 +5,12 @@ let socket: Socket | null = null;
 export const connectSocket = (token: string) => {
   if (socket?.connected) return socket;
 
-  socket = io(
-    process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") ||
-      "http://localhost:3000",
-    {
-      path: "/documents",
-      auth: { token },
-      transports: ["websocket"],
-    },
-  );
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") || "http://localhost:3000";
+  
+  socket = io(`${baseUrl}/documents`, {
+    auth: { token },
+    transports: ["websocket"],
+  });
 
   return socket;
 };

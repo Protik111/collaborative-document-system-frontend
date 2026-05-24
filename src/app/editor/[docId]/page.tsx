@@ -182,16 +182,13 @@ export default function EditorPage() {
     const socket = getSocket();
     socket?.emit("join_document", { docId, documentId: docId });
 
-    const handleBlockUpdate = ({
-      blockId,
-      content,
-      updatedBy,
-    }: {
-      blockId: string;
-      content: any;
-      updatedBy: string;
-    }) => {
+    const handleBlockUpdate = (payload: any) => {
+      const data = payload.block || payload;
+      const { blockId, content, updatedBy } = data;
+      
+      if (!blockId) return;
       if (updatedBy === currentUser?.userId) return; // Skip own updates
+      
       setBlocks((prev) =>
         prev.map((b) => (b.id === blockId ? { ...b, content } : b)),
       );
@@ -234,7 +231,10 @@ export default function EditorPage() {
     socket?.on("user_joined", handleUserJoined);
     socket?.on("user_left", handleUserLeft);
 
-    const handleBlockCreated = ({ block }: { block: Block }) => {
+    const handleBlockCreated = (payload: any) => {
+      const block = payload.block || payload;
+      if (!block || !block.id) return;
+
       setBlocks((prev) => {
         if (prev.some(b => b.id === block.id)) return prev;
         return [...prev, block].sort((a, b) => a.position - b.position);
