@@ -7,7 +7,7 @@ export const connectSocket = (token: string) => {
 
   socket = io(
     process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") ||
-      "http://localhost:3001",
+      "http://localhost:3000",
     {
       path: "/documents",
       auth: { token },

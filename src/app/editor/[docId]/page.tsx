@@ -234,11 +234,12 @@ export default function EditorPage() {
     socket?.on("user_joined", handleUserJoined);
     socket?.on("user_left", handleUserLeft);
 
-    const handleBlockAdded = ({ block }: { block: Block }) => {
-      setBlocks((prev) =>
-        [...prev, block].sort((a, b) => a.position - b.position),
-      );
-      toast.success("New block added by collaborator");
+    const handleBlockCreated = ({ block }: { block: Block }) => {
+      setBlocks((prev) => {
+        if (prev.some(b => b.id === block.id)) return prev;
+        return [...prev, block].sort((a, b) => a.position - b.position);
+      });
+      toast.success("Block created", { icon: "✨" });
     };
 
     const handleBlockDeleted = ({ blockId }: { blockId: string }) => {
@@ -263,14 +264,14 @@ export default function EditorPage() {
     };
 
     socket?.on("block_updated", handleBlockUpdate);
-    socket?.on("block_added", handleBlockAdded);
+    socket?.on("block_created", handleBlockCreated);
     socket?.on("block_deleted", handleBlockDeleted);
     socket?.on("block_moved", handleBlockMoved);
 
     return () => {
       socket?.emit("leave_document", { docId, documentId: docId });
       socket?.off("block_updated", handleBlockUpdate);
-      socket?.off("block_added", handleBlockAdded);
+      socket?.off("block_created", handleBlockCreated);
       socket?.off("block_deleted", handleBlockDeleted);
       socket?.off("block_moved", handleBlockMoved);
       socket?.off("active_users");
@@ -326,67 +327,54 @@ export default function EditorPage() {
   // ─────────────────────────────────────────────────────────────
 
   const addBlock = useCallback(
-    async (type: BlockType = "paragraph") => {
-      if (!workspaceId) return;
-      setLoading(true);
-      try {
-        const maxPos = Math.max(-1, ...blocks.map((b) => b.position));
-        const { data } = await blockAPI.create(workspaceId, docId as string, {
-          type,
-          content: "",
-          position: maxPos + 1,
-        });
-        setBlocks((prev) =>
-          [...prev, data].sort((a, b) => a.position - b.position),
-        );
-        // Broadcast to others
-        getSocket()?.emit("block_add", {
-          docId,
-          documentId: docId,
-          block: data,
-        });
-        toast.success("Block added");
-      } catch {
-        toast.error("Failed to add block");
-      } finally {
-        setLoading(false);
+    (type: BlockType = "paragraph") => {
+      const socket = getSocket();
+      if (!socket) {
+        toast.error("Socket not connected");
+        return;
       }
+
+      const maxPos = Math.max(-1, ...blocks.map((b) => b.position));
+      
+      // Emit block_create per tech spec
+      socket.emit("block_create", {
+        docId, // fallback
+        documentId: docId,
+        type,
+        content: "",
+        position: maxPos + 1,
+      });
+      
+      toast.loading("Creating block...", { duration: 1000, id: "block-create" });
     },
-    [workspaceId, docId, blocks],
+    [docId, blocks],
   );
 
-  const updateBlock = async (id: string, content: any) => {
-    // Also update focus locally
-    const socket = getSocket();
-    if (socket && workspaceId) {
-      socket.emit("presence_update", { docId, documentId: docId, blockId: id });
-    }
-    
+  const updateBlock = (id: string, content: any) => {
+    // Local state update
     setBlocks((prev) =>
       prev.map((b) => (b.id === id ? { ...b, content } : b)),
     );
 
-    // Debounce API call and Broadcast
+    // Emit focus update immediately
+    const socket = getSocket();
+    if (socket) {
+      socket.emit("presence_update", { docId, documentId: docId, blockId: id });
+    }
+
+    // Debounce Socket Broadcast (Backend auto-persists changes from block_update)
     if (updateTimerRef.current[id]) {
       clearTimeout(updateTimerRef.current[id]);
     }
 
-    updateTimerRef.current[id] = setTimeout(async () => {
-      try {
-        await blockAPI.update(workspaceId!, docId as string, id, {
-          content: content,
-        });
-        // Broadcast to others
-        getSocket()?.emit("block_update", {
-          docId,
-          documentId: docId,
-          blockId: id,
-          content: content,
-          updatedBy: currentUser?.userId
-        });
-      } catch {
-        toast.error("Failed to save block");
-      }
+    updateTimerRef.current[id] = setTimeout(() => {
+      socket?.emit("block_update", {
+        docId,
+        documentId: docId,
+        blockId: id,
+        content: content,
+        updatedBy: currentUser?.userId
+      });
     }, 500);
   };
 
