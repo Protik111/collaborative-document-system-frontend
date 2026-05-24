@@ -8,6 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import toast from "react-hot-toast";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { FileText, Plus, Search, ChevronLeft, Clock, MoreVertical, FilePlus } from "lucide-react";
 
 export default function WorkspacePage() {
@@ -17,6 +25,7 @@ export default function WorkspacePage() {
   const [workspace, setWorkspace] = useState<any>(null);
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -48,6 +57,7 @@ export default function WorkspacePage() {
     try {
       await documentAPI.create(id as string, { title });
       setTitle("");
+      setIsModalOpen(false);
       await fetchData();
       toast.success("Document created");
     } catch {
@@ -62,7 +72,7 @@ export default function WorkspacePage() {
   }, [id]);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in">
+    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in min-h-screen bg-gradient-premium">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')} className="rounded-full hover:bg-white/5">
@@ -90,38 +100,55 @@ export default function WorkspacePage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Create Document Card */}
-        <Card className="group cursor-pointer border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/20 h-full min-h-[200px] flex flex-col items-center justify-center space-y-3">
-          <div className="size-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform">
-            <FilePlus className="size-6 text-neutral-400 group-hover:text-white transition-colors" />
-          </div>
-          <div className="text-center">
-             <p className="font-medium text-neutral-300 group-hover:text-white transition-colors">New Document</p>
-             <p className="text-xs text-neutral-500">Create a blank canvas</p>
-          </div>
-          
-          <div className="absolute inset-x-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Input
-              placeholder="Document title..."
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createDoc()}
-              className="bg-neutral-900 border-white/10 h-8 text-xs mb-2"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <Button 
-              onClick={(e) => { e.stopPropagation(); createDoc(); }} 
-              disabled={loading || !title.trim()}
-              className="w-full h-8 text-xs bg-neutral-100 text-neutral-900 hover:bg-white"
-            >
-              {loading ? "Creating..." : "Confirm"}
-            </Button>
-          </div>
-        </Card>
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Card className="group cursor-pointer border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/20 h-full min-h-[200px] flex flex-col items-center justify-center space-y-3 relative overflow-hidden">
+              <div className="size-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform">
+                <FilePlus className="size-6 text-neutral-400 group-hover:text-white transition-colors" />
+              </div>
+              <div className="text-center">
+                 <p className="font-medium text-neutral-300 group-hover:text-white transition-colors">New Document</p>
+                 <p className="text-xs text-neutral-500">Create a blank canvas</p>
+              </div>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="bg-neutral-900 border-white/10">
+            <DialogHeader>
+              <DialogTitle className="text-white">Create New Document</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                placeholder="Document title..."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && createDoc()}
+                className="bg-neutral-800 border-white/10 text-white"
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsModalOpen(false)} 
+                className="border-white/10 hover:bg-white/5 text-white"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={createDoc} 
+                disabled={loading || !title.trim()}
+                className="bg-neutral-100 text-neutral-900 hover:bg-white"
+              >
+                {loading ? "Creating..." : "Create Document"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {docs.map((doc) => (
           <Card
             key={doc.id}
-            className="group relative cursor-pointer glass-card hover-glow transition-all duration-300 border-white/5 flex flex-col h-[200px]"
+            className="group relative cursor-pointer bg-white/[0.03] hover:bg-white/[0.05] transition-all duration-300 border-white/10 flex flex-col h-[200px] rounded-2xl overflow-hidden"
             onClick={() => router.push(`/editor/${doc.id}`)}
           >
             <CardHeader className="pb-2 flex-row items-start justify-between space-y-0">

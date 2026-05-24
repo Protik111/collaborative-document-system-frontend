@@ -570,8 +570,8 @@ export default function EditorPage() {
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-white/5">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push(`/workspaces/${workspaceId}`)}>
-              <ChevronRight className="h-5 w-5 rotate-180" />
+            <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full hover:bg-white/5">
+              <ChevronDown className="h-5 w-5 rotate-90" />
             </Button>
             <div className="h-4 w-px bg-border" />
             <div className="flex items-center gap-2">
@@ -639,11 +639,18 @@ export default function EditorPage() {
         {/* Main Editor Canvas */}
         <main className={`flex-1 transition-all duration-300 ease-in-out ${isSidebarOpen ? "mr-80" : ""}`}>
           {/* Cover Image Area */}
-          <div className="h-64 w-full bg-muted relative group/cover overflow-hidden">
-             <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/20 opacity-0 group-hover/cover:opacity-100 transition-opacity" />
-             <div className="absolute right-8 bottom-4 opacity-0 group-hover/cover:opacity-100 transition-opacity flex gap-2">
-                <Button variant="secondary" size="sm" className="bg-background/80 backdrop-blur-md">Change Cover</Button>
-                <Button variant="secondary" size="sm" className="bg-background/80 backdrop-blur-md">Reposition</Button>
+          <div className="h-56 w-full cover-gradient-default relative group/cover overflow-hidden">
+             {/* Decorative noise/mesh overlay */}
+             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.75\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'1\'/%3E%3C/svg%3E")', backgroundSize: '200px 200px' }} />
+             {/* Glowing orbs */}
+             <div className="absolute top-8 left-1/4 w-32 h-32 rounded-full bg-blue-500/20 blur-3xl" />
+             <div className="absolute top-4 right-1/3 w-24 h-24 rounded-full bg-violet-500/20 blur-2xl" />
+             <div className="absolute bottom-4 left-1/2 w-40 h-20 rounded-full bg-indigo-500/15 blur-3xl" />
+             {/* Bottom gradient for text readability */}
+             <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
+             {/* Hover controls */}
+             <div className="absolute right-8 bottom-4 opacity-0 group-hover/cover:opacity-100 transition-all duration-200 flex gap-2">
+                <Button variant="secondary" size="sm" className="bg-background/70 backdrop-blur-md border border-white/10 hover:bg-background/90 text-xs h-8">🖼 Change Cover</Button>
              </div>
           </div>
 

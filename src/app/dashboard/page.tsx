@@ -8,12 +8,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import toast from "react-hot-toast";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Plus, Search, MoreVertical, LayoutGrid, List as ListIcon, Clock, Users } from "lucide-react";
 
 export default function DashboardPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
 
   const fetchWorkspaces = async () => {
@@ -31,6 +40,7 @@ export default function DashboardPage() {
     try {
       await workspaceAPI.create({ name: newName });
       setNewName("");
+      setIsModalOpen(false);
       await fetchWorkspaces();
       toast.success("Workspace created");
     } catch {
@@ -45,7 +55,9 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in">
+    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in min-h-screen bg-gradient-premium">
+      {/* Subtle accent glow */}
+      <div className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] rounded-full opacity-30" style={{ background: 'radial-gradient(ellipse at center, oklch(0.35 0.15 265 / 50%), transparent 70%)' }} />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-4xl font-bold tracking-tight premium-gradient-text">Workspaces</h1>
@@ -67,38 +79,55 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Create Workspace Card */}
-        <Card className="group cursor-pointer border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/20 h-full min-h-[160px] flex flex-col items-center justify-center space-y-3">
-          <div className="size-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform">
-            <Plus className="size-6 text-neutral-400 group-hover:text-white transition-colors" />
-          </div>
-          <div className="text-center">
-             <p className="font-medium text-neutral-300 group-hover:text-white transition-colors">Create Workspace</p>
-             <p className="text-xs text-neutral-500">Start a new collaboration</p>
-          </div>
-          
-          <div className="absolute inset-x-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Input
-              placeholder="Workspace name..."
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createWorkspace()}
-              className="bg-neutral-900 border-white/10 h-8 text-xs mb-2"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <Button 
-              onClick={(e) => { e.stopPropagation(); createWorkspace(); }} 
-              disabled={loading || !newName.trim()}
-              className="w-full h-8 text-xs bg-neutral-100 text-neutral-900 hover:bg-white"
-            >
-              {loading ? "Creating..." : "Confirm"}
-            </Button>
-          </div>
-        </Card>
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Card className="group cursor-pointer border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/20 h-full min-h-[160px] flex flex-col items-center justify-center space-y-3 relative overflow-hidden">
+              <div className="size-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform">
+                <Plus className="size-6 text-neutral-400 group-hover:text-white transition-colors" />
+              </div>
+              <div className="text-center">
+                 <p className="font-medium text-neutral-300 group-hover:text-white transition-colors">Create Workspace</p>
+                 <p className="text-xs text-neutral-500">Start a new collaboration</p>
+              </div>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="bg-neutral-900 border-white/10">
+            <DialogHeader>
+              <DialogTitle className="text-white">Create New Workspace</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                placeholder="Workspace name..."
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && createWorkspace()}
+                className="bg-neutral-800 border-white/10 text-white"
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsModalOpen(false)} 
+                className="border-white/10 hover:bg-white/5 text-white"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={createWorkspace} 
+                disabled={loading || !newName.trim()}
+                className="bg-neutral-100 text-neutral-900 hover:bg-white"
+              >
+                {loading ? "Creating..." : "Create Workspace"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {workspaces.map((ws) => (
           <Card
             key={ws.id}
-            className="group relative cursor-pointer glass-card hover-glow transition-all duration-300 border-white/5 flex flex-col h-full"
+            className="group relative cursor-pointer bg-white/[0.03] hover:bg-white/[0.05] transition-all duration-300 border-white/10 flex flex-col h-full rounded-2xl overflow-hidden"
             onClick={() => router.push(`/workspaces/${ws.id}`)}
           >
             <CardHeader className="pb-3 flex-row items-start justify-between space-y-0">
