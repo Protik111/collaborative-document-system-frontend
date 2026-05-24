@@ -82,6 +82,9 @@ export default function EditorPage() {
     email: string;
     role?: string;
   } | null>(null);
+  const [activeCollaborators, setActiveCollaborators] = useState<
+    { userId: string; email: string }[]
+  >([]);
 
   // UI State
   const [loading, setLoading] = useState(false);
@@ -182,7 +185,11 @@ export default function EditorPage() {
       toast.success("Live update received");
     };
 
-    const handleUserJoined = ({ email }: { email: string }) => {
+    const handleUserJoined = ({ userId, email }: { userId: string; email: string }) => {
+      setActiveCollaborators((prev) => {
+        if (prev.some((u) => u.userId === userId)) return prev;
+        return [...prev, { userId, email }];
+      });
       toast(`${email} is now viewing`, { icon: "👁️" });
     };
 
@@ -589,20 +596,32 @@ export default function EditorPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Collaborators */}
+            {/* Active Collaborators */}
             <div className="flex -space-x-2 mr-4">
-              {members.slice(0, 3).map((m) => (
-                <Avatar key={m.userId} className="h-8 w-8 border-2 border-background ring-2 ring-transparent hover:ring-primary/20 transition-all cursor-help">
+              {activeCollaborators.slice(0, 5).map((u) => (
+                <div key={u.userId} className="relative group/avatar">
+                  <Avatar className="h-8 w-8 border-2 border-background ring-2 ring-emerald-500/20 transition-all cursor-help">
+                    <AvatarFallback className="text-[10px] bg-emerald-500/10 text-emerald-500 font-bold">
+                      {u.email[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-background shadow-lg shadow-emerald-500/50" />
+                  
+                  {/* Tooltip */}
+                  <div className="absolute top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-neutral-900 border border-white/10 rounded text-[10px] text-white whitespace-nowrap opacity-0 group-hover/avatar:opacity-100 transition-opacity pointer-events-none z-[100]">
+                    {u.email} (Active)
+                  </div>
+                </div>
+              ))}
+              
+              {/* Show remaining members if any */}
+              {members.filter(m => !activeCollaborators.some(ac => ac.userId === m.userId)).slice(0, 2).map((m) => (
+                <Avatar key={m.userId} className="h-8 w-8 border-2 border-background opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help">
                   <AvatarFallback className="text-[10px] bg-secondary">
                     {m.name?.[0] || m.email[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               ))}
-              {members.length > 3 && (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium">
-                  +{members.length - 3}
-                </div>
-              )}
             </div>
 
             <Button variant="outline" size="sm" className="rounded-full px-4 gap-2 border-primary/20 hover:bg-primary/5">

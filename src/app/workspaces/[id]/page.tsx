@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { documentAPI, workspaceAPI } from "@/lib/api";
+import { getSocket } from "@/lib/socket";
 import type { Document, WorkspaceMember } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,6 +114,28 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     fetchData();
+
+    // Setup Socket connection for workspace updates
+    const socket = getSocket();
+    if (socket && id) {
+      socket.emit("join_workspace", { workspaceId: id });
+
+      const handleMemberAdded = (newMember: WorkspaceMember) => {
+        setMembers((prev) => {
+          // Avoid duplicates
+          if (prev.some((m) => m.userId === newMember.userId)) return prev;
+          return [...prev, newMember];
+        });
+        toast.success(`${newMember.name || newMember.email} joined the workspace!`, { icon: "👋" });
+      };
+
+      socket.on("workspace_member_added", handleMemberAdded);
+
+      return () => {
+        socket.off("workspace_member_added", handleMemberAdded);
+        // Note: we don't necessarily need leave_workspace unless we want to be very precise
+      };
+    }
   }, [id]);
 
   return (
