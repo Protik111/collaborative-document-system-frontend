@@ -192,7 +192,6 @@ export default function EditorPage() {
       setBlocks((prev) =>
         prev.map((b) => (b.id === blockId ? { ...b, content } : b)),
       );
-      toast.success("Live update received");
     };
 
     socket?.on("active_users", (users: User[]) => {
@@ -239,12 +238,20 @@ export default function EditorPage() {
         if (prev.some(b => b.id === block.id)) return prev;
         return [...prev, block].sort((a, b) => a.position - b.position);
       });
-      toast.success("Block created", { icon: "✨" });
     };
 
     const handleBlockDeleted = ({ blockId }: { blockId: string }) => {
       setBlocks((prev) => prev.filter((b) => b.id !== blockId));
-      toast.success("Block deleted by collaborator");
+    };
+
+    const handleBlockReordered = ({ blockId, newPosition }: { blockId: string; newPosition: number }) => {
+      setBlocks((prev) => {
+        const newBlocks = [...prev];
+        const idx = newBlocks.findIndex((b) => b.id === blockId);
+        if (idx === -1) return prev;
+        newBlocks[idx] = { ...newBlocks[idx], position: newPosition };
+        return newBlocks.sort((a, b) => a.position - b.position);
+      });
     };
 
     const handleBlockMoved = ({
@@ -260,12 +267,12 @@ export default function EditorPage() {
         });
         return newBlocks.sort((a, b) => a.position - b.position);
       });
-      toast.success("Block reordered by collaborator");
     };
 
     socket?.on("block_updated", handleBlockUpdate);
     socket?.on("block_created", handleBlockCreated);
     socket?.on("block_deleted", handleBlockDeleted);
+    socket?.on("block_reordered", handleBlockReordered);
     socket?.on("block_moved", handleBlockMoved);
 
     return () => {
@@ -273,6 +280,7 @@ export default function EditorPage() {
       socket?.off("block_updated", handleBlockUpdate);
       socket?.off("block_created", handleBlockCreated);
       socket?.off("block_deleted", handleBlockDeleted);
+      socket?.off("block_reordered", handleBlockReordered);
       socket?.off("block_moved", handleBlockMoved);
       socket?.off("active_users");
       socket?.off("presence_update");
@@ -296,7 +304,6 @@ export default function EditorPage() {
         title: docTitle,
       });
       setDocument((prev) => (prev ? { ...prev, title: docTitle } : null));
-      toast.success("Title updated");
     } catch {
       toast.error("Failed to update title");
       setDocTitle(document?.title || "");
@@ -313,7 +320,6 @@ export default function EditorPage() {
     setLoading(true);
     try {
       await documentAPI.remove(workspaceId, docId as string);
-      toast.success("Document deleted");
       router.push(`/workspaces/${workspaceId}`);
     } catch {
       toast.error("Failed to delete document");
@@ -344,8 +350,6 @@ export default function EditorPage() {
         content: "",
         position: maxPos + 1,
       });
-      
-      toast.loading("Creating block...", { duration: 1000, id: "block-create" });
     },
     [docId, blocks],
   );
@@ -379,30 +383,35 @@ export default function EditorPage() {
   };
 
   const deleteBlock = useCallback(
-    async (blockId: string) => {
-      if (!workspaceId) return;
+    (blockId: string) => {
       if (!confirm("Delete this block?")) return;
 
-      try {
-        await blockAPI.remove(workspaceId, docId as string, blockId);
-        setBlocks((prev) => prev.filter((b) => b.id !== blockId));
-        // Broadcast to others
-        getSocket()?.emit("block_delete", {
-          docId,
-          documentId: docId,
-          blockId,
-        });
-        toast.success("Block deleted");
-      } catch {
-        toast.error("Failed to delete block");
+      const socket = getSocket();
+      if (!socket) {
+        toast.error("Socket not connected");
+        return;
       }
+
+      // Optimistic UI update
+      setBlocks((prev) => prev.filter((b) => b.id !== blockId));
+
+      // Emit socket event — backend persists & broadcasts block_deleted
+      socket.emit("block_delete", {
+        documentId: docId,
+        blockId,
+      });
     },
-    [workspaceId, docId],
+    [docId],
   );
 
   const moveBlock = useCallback(
-    async (blockId: string, direction: "up" | "down") => {
-      if (!workspaceId) return;
+    (blockId: string, direction: "up" | "down") => {
+      const socket = getSocket();
+      if (!socket) {
+        toast.error("Socket not connected");
+        return;
+      }
+
       const index = blocks.findIndex((b) => b.id === blockId);
       if (
         (direction === "up" && index === 0) ||
@@ -411,39 +420,24 @@ export default function EditorPage() {
         return;
 
       const newIndex = direction === "up" ? index - 1 : index + 1;
+
+      // Optimistic UI update
       const newBlocks = [...blocks];
       [newBlocks[index], newBlocks[newIndex]] = [
         newBlocks[newIndex],
         newBlocks[index],
       ];
       newBlocks.forEach((b, i) => (b.position = i));
-
       setBlocks(newBlocks);
 
-      try {
-        // Update both blocks' positions on server
-        await Promise.all([
-          blockAPI.update(workspaceId, docId as string, blockId, {
-            position: newBlocks[index].position,
-          }),
-          blockAPI.update(
-            workspaceId,
-            docId as string,
-            newBlocks[newIndex].id,
-            { position: newBlocks[newIndex].position },
-          ),
-        ]);
-        // Broadcast to others
-        getSocket()?.emit("block_move", {
-          docId,
-          documentId: docId,
-          blocks: [newBlocks[index], newBlocks[newIndex]],
-        });
-      } catch {
-        toast.error("Failed to reorder blocks");
-      }
+      // Emit socket event — backend persists & broadcasts block_reordered
+      socket.emit("block_reorder", {
+        documentId: docId,
+        blockId,
+        newPosition: newIndex,
+      });
     },
-    [workspaceId, docId, blocks],
+    [docId, blocks],
   );
 
   // ─────────────────────────────────────────────────────────────
@@ -464,7 +458,6 @@ export default function EditorPage() {
       // Refresh versions list
       const { data } = await versionAPI.list(workspaceId, docId as string);
       setVersions(data);
-      toast.success("Version saved");
     } catch {
       toast.error("Failed to save version");
     } finally {
@@ -487,7 +480,6 @@ export default function EditorPage() {
         const { data } = await blockAPI.list(workspaceId, docId as string);
         setBlocks(data.sort((a: Block, b: Block) => a.position - b.position));
         setIsVersionDialogOpen(false);
-        toast.success("Document restored");
       } catch {
         toast.error("Failed to restore version");
       } finally {
@@ -514,7 +506,6 @@ export default function EditorPage() {
       // Refresh members
       const { data } = await workspaceAPI.listMembers(workspaceId);
       setMembers(data);
-      toast.success(`Invite sent to ${inviteEmail}`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to send invite");
     } finally {
@@ -530,7 +521,6 @@ export default function EditorPage() {
         setMembers((prev) =>
           prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)),
         );
-        toast.success("Role updated");
       } catch {
         toast.error("Failed to update role");
       }
@@ -552,7 +542,6 @@ export default function EditorPage() {
     try {
       await workspaceAPI.removeMember(workspaceId, memberToRemove);
       setMembers((prev) => prev.filter((m) => m.userId !== memberToRemove));
-      toast.success("Member removed");
       setIsConfirmOpen(false);
     } catch {
       toast.error("Failed to remove member");
