@@ -99,10 +99,24 @@ export default function EditorPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeSidebarTab, setActiveSidebarTab] = useState<"versions" | "members">("versions");
   
-  // Confirmation Modal state
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
-  const [confirmLoading, setConfirmLoading] = useState(false);
+  // Generic Confirmation Modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant: "default" | "destructive";
+    confirmText: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+    variant: "default",
+    confirmText: "Confirm",
+    loading: false,
+  });
   
   const updateTimerRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
   const titleTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -321,18 +335,27 @@ export default function EditorPage() {
 
   const deleteDocument = useCallback(async () => {
     if (!workspaceId) return;
-    if (!confirm("Delete this document permanently? This cannot be undone."))
-      return;
-
-    setLoading(true);
-    try {
-      await documentAPI.remove(workspaceId, docId as string);
-      router.push(`/workspaces/${workspaceId}`);
-    } catch {
-      toast.error("Failed to delete document");
-    } finally {
-      setLoading(false);
-    }
+    
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Document",
+      description: "Are you sure you want to delete this document permanently? This cannot be undone.",
+      confirmText: "Delete",
+      variant: "destructive",
+      loading: false,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          await documentAPI.remove(workspaceId, docId as string);
+          router.push(`/workspaces/${workspaceId}`);
+          toast.success("Document deleted");
+        } catch {
+          toast.error("Failed to delete document");
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false, loading: false }));
+        }
+      }
+    });
   }, [workspaceId, docId, router]);
 
   // ─────────────────────────────────────────────────────────────
@@ -391,21 +414,31 @@ export default function EditorPage() {
 
   const deleteBlock = useCallback(
     (blockId: string) => {
-      if (!confirm("Delete this block?")) return;
+      setConfirmModal({
+        isOpen: true,
+        title: "Delete Block",
+        description: "Are you sure you want to delete this block? This cannot be undone.",
+        confirmText: "Delete",
+        variant: "destructive",
+        loading: false,
+        onConfirm: () => {
+          const socket = getSocket();
+          if (!socket) {
+            toast.error("Socket not connected");
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            return;
+          }
 
-      const socket = getSocket();
-      if (!socket) {
-        toast.error("Socket not connected");
-        return;
-      }
+          // Optimistic UI update
+          setBlocks((prev) => prev.filter((b) => b.id !== blockId));
 
-      // Optimistic UI update
-      setBlocks((prev) => prev.filter((b) => b.id !== blockId));
-
-      // Emit socket event — backend persists & broadcasts block_deleted
-      socket.emit("block_delete", {
-        documentId: docId,
-        blockId,
+          // Emit socket event — backend persists & broadcasts block_deleted
+          socket.emit("block_delete", {
+            documentId: docId,
+            blockId,
+          });
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       });
     },
     [docId],
@@ -475,23 +508,30 @@ export default function EditorPage() {
   const restoreVersion = useCallback(
     async (versionId: string) => {
       if (!workspaceId) return;
-      if (
-        !confirm("Restore to this version? Current content will be replaced.")
-      )
-        return;
-
-      setLoading(true);
-      try {
-        await versionAPI.restore(workspaceId, docId as string, versionId);
-        // Refresh blocks after restore
-        const { data } = await blockAPI.list(workspaceId, docId as string);
-        setBlocks(data.sort((a: Block, b: Block) => a.position - b.position));
-        setIsVersionDialogOpen(false);
-      } catch {
-        toast.error("Failed to restore version");
-      } finally {
-        setLoading(false);
-      }
+      
+      setConfirmModal({
+        isOpen: true,
+        title: "Restore Version",
+        description: "Are you sure you want to restore to this version? Current content will be replaced.",
+        confirmText: "Restore",
+        variant: "default",
+        loading: false,
+        onConfirm: async () => {
+          setConfirmModal(prev => ({ ...prev, loading: true }));
+          try {
+            await versionAPI.restore(workspaceId, docId as string, versionId);
+            // Refresh blocks after restore
+            const { data } = await blockAPI.list(workspaceId, docId as string);
+            setBlocks(data.sort((a: Block, b: Block) => a.position - b.position));
+            setIsVersionDialogOpen(false);
+            toast.success("Version restored");
+          } catch {
+            toast.error("Failed to restore version");
+          } finally {
+            setConfirmModal(prev => ({ ...prev, isOpen: false, loading: false }));
+          }
+        }
+      });
     },
     [workspaceId, docId],
   );
@@ -537,25 +577,30 @@ export default function EditorPage() {
 
   const removeMember = useCallback(
     async (userId: string) => {
-      setMemberToRemove(userId);
-      setIsConfirmOpen(true);
+      setConfirmModal({
+        isOpen: true,
+        title: "Remove Member",
+        description: "Are you sure you want to remove this member? They will no longer be able to access this workspace.",
+        confirmText: "Remove",
+        variant: "destructive",
+        loading: false,
+        onConfirm: async () => {
+          if (!workspaceId) return;
+          setConfirmModal(prev => ({ ...prev, loading: true }));
+          try {
+            await workspaceAPI.removeMember(workspaceId, userId);
+            setMembers((prev) => prev.filter((m) => m.userId !== userId));
+            toast.success("Member removed");
+          } catch {
+            toast.error("Failed to remove member");
+          } finally {
+            setConfirmModal(prev => ({ ...prev, isOpen: false, loading: false }));
+          }
+        }
+      });
     },
-    [],
+    [workspaceId],
   );
-
-  const handleConfirmRemove = async () => {
-    if (!memberToRemove || !workspaceId) return;
-    setConfirmLoading(true);
-    try {
-      await workspaceAPI.removeMember(workspaceId, memberToRemove);
-      setMembers((prev) => prev.filter((m) => m.userId !== memberToRemove));
-      setIsConfirmOpen(false);
-    } catch {
-      toast.error("Failed to remove member");
-    } finally {
-      setConfirmLoading(false);
-    }
-  };
 
   // ─────────────────────────────────────────────────────────────
   // Render Helpers
@@ -953,14 +998,14 @@ export default function EditorPage() {
       </div>
 
       <ConfirmationModal
-        isOpen={isConfirmOpen}
-        onClose={() => setIsConfirmOpen(false)}
-        onConfirm={handleConfirmRemove}
-        isLoading={confirmLoading}
-        title="Remove Member"
-        description="Are you sure you want to remove this member? They will no longer be able to access this workspace."
-        confirmText="Remove"
-        variant="destructive"
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        isLoading={confirmModal.loading}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
       />
     </div>
   );
