@@ -43,6 +43,9 @@ export default function WorkspacePage() {
   const [inviteRole, setInviteRole] = useState<WorkspaceMember["role"]>("MEMBER");
   const [currentUser, setCurrentUser] = useState<{ userId: string; email: string } | null>(null);
   
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  
   // Confirmation Modal state
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [confirmData, setConfirmData] = useState<{ userId: string; isLeaving: boolean } | null>(null);
@@ -169,10 +172,31 @@ export default function WorkspacePage() {
 
       return () => {
         socket.off("workspace_member_added", handleMemberAdded);
-        // Note: we don't necessarily need leave_workspace unless we want to be very precise
       };
     }
   }, [id]);
+
+  // Handle Search Debouncing
+  useEffect(() => {
+    const handler = setTimeout(async () => {
+      if (searchQuery.length >= 2) {
+        setIsSearching(true);
+        try {
+          const { data } = await documentAPI.search(id as string, searchQuery);
+          setDocs(data);
+        } catch {
+          toast.error("Search failed");
+        } finally {
+          setIsSearching(false);
+        }
+      } else if (searchQuery.length === 0) {
+        // Revert to default list when search is cleared
+        fetchData();
+      }
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery, id]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in min-h-screen bg-gradient-premium">
@@ -192,8 +216,13 @@ export default function WorkspacePage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input 
               placeholder="Search documents..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 bg-white/5 border-white/10 h-10 focus:ring-1 focus:ring-white/20"
             />
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 size-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            )}
           </div>
           <Button onClick={fetchData} variant="outline" className="border-white/10 hover:bg-white/5">
             ↻ Refresh
@@ -282,9 +311,22 @@ export default function WorkspacePage() {
 
       {docs.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 bg-white/[0.01] border border-dashed border-white/5 rounded-3xl animate-in">
-           <FileText className="size-12 text-neutral-700 mb-4" />
-           <h3 className="text-xl font-medium text-neutral-300">No documents yet</h3>
-           <p className="text-neutral-500 mb-6">Create your first document in this workspace to get started.</p>
+           {searchQuery.length >= 2 ? (
+             <>
+               <Search className="size-12 text-neutral-700 mb-4" />
+               <h3 className="text-xl font-medium text-neutral-300">No documents found matching your search</h3>
+               <p className="text-neutral-500 mb-6">Try searching for something else or clear the search.</p>
+               <Button variant="outline" onClick={() => setSearchQuery("")} className="border-white/10 hover:bg-white/5">
+                 Clear search
+               </Button>
+             </>
+           ) : (
+             <>
+               <FileText className="size-12 text-neutral-700 mb-4" />
+               <h3 className="text-xl font-medium text-neutral-300">No documents yet</h3>
+               <p className="text-neutral-500 mb-6">Create your first document in this workspace to get started.</p>
+             </>
+           )}
         </div>
       )}
 

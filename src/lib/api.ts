@@ -92,6 +92,10 @@ export const documentAPI = {
     api.patch<Document>(`/workspaces/${workspaceId}/documents/${docId}`, data),
   remove: (workspaceId: string, docId: string) =>
     api.delete(`/workspaces/${workspaceId}/documents/${docId}`),
+  search: (workspaceId: string, query: string) =>
+    api.get<Document[]>(`/workspaces/${workspaceId}/documents/search`, {
+      params: { q: query },
+    }),
 };
 
 // Block
