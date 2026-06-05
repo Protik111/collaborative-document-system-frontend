@@ -105,6 +105,7 @@ export default function EditorPage() {
   const [confirmLoading, setConfirmLoading] = useState(false);
   
   const updateTimerRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
+  const titleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch current user + document + workspace context
   useEffect(() => {
@@ -244,14 +245,9 @@ export default function EditorPage() {
       setBlocks((prev) => prev.filter((b) => b.id !== blockId));
     };
 
-    const handleBlockReordered = ({ blockId, newPosition }: { blockId: string; newPosition: number }) => {
-      setBlocks((prev) => {
-        const newBlocks = [...prev];
-        const idx = newBlocks.findIndex((b) => b.id === blockId);
-        if (idx === -1) return prev;
-        newBlocks[idx] = { ...newBlocks[idx], position: newPosition };
-        return newBlocks.sort((a, b) => a.position - b.position);
-      });
+    const handleBlocksReordered = (data: { documentId: string; blocks: Block[]; reorderedBy: string }) => {
+      // Replace the entire local blocks array with data.blocks per tech spec
+      setBlocks(data.blocks);
     };
 
     const handleBlockMoved = ({
@@ -269,19 +265,28 @@ export default function EditorPage() {
       });
     };
 
+    // Title update from other collaborators
+    const handleTitleUpdated = (data: { documentId: string; title: string; updatedBy: string; email: string }) => {
+      if (data.documentId !== docId) return;
+      setDocTitle(data.title);
+      setDocument((prev) => (prev ? { ...prev, title: data.title } : null));
+    };
+
     socket?.on("block_updated", handleBlockUpdate);
     socket?.on("block_created", handleBlockCreated);
     socket?.on("block_deleted", handleBlockDeleted);
-    socket?.on("block_reordered", handleBlockReordered);
+    socket?.on("blocks_reordered", handleBlocksReordered);
     socket?.on("block_moved", handleBlockMoved);
+    socket?.on("title_updated", handleTitleUpdated);
 
     return () => {
       socket?.emit("leave_document", { docId, documentId: docId });
       socket?.off("block_updated", handleBlockUpdate);
       socket?.off("block_created", handleBlockCreated);
       socket?.off("block_deleted", handleBlockDeleted);
-      socket?.off("block_reordered", handleBlockReordered);
+      socket?.off("blocks_reordered", handleBlocksReordered);
       socket?.off("block_moved", handleBlockMoved);
+      socket?.off("title_updated", handleTitleUpdated);
       socket?.off("active_users");
       socket?.off("presence_update");
       socket?.off("user_joined", handleUserJoined);
@@ -296,21 +301,21 @@ export default function EditorPage() {
   // Document Operations
   // ─────────────────────────────────────────────────────────────
 
-  const updateDocumentTitle = useCallback(async () => {
-    if (!workspaceId || !docTitle.trim()) return;
-    setLoading(true);
-    try {
-      await documentAPI.update(workspaceId, docId as string, {
-        title: docTitle,
+  const updateDocumentTitle = useCallback((newTitle: string) => {
+    setDocTitle(newTitle);
+    setDocument((prev) => (prev ? { ...prev, title: newTitle } : null));
+
+    // Debounce the socket emit
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    titleTimerRef.current = setTimeout(() => {
+      const socket = getSocket();
+      if (!socket) return;
+      socket.emit("title_update", {
+        documentId: docId,
+        title: newTitle,
       });
-      setDocument((prev) => (prev ? { ...prev, title: docTitle } : null));
-    } catch {
-      toast.error("Failed to update title");
-      setDocTitle(document?.title || "");
-    } finally {
-      setLoading(false);
-    }
-  }, [workspaceId, docId, docTitle, document]);
+    }, 500);
+  }, [docId]);
 
   const deleteDocument = useCallback(async () => {
     if (!workspaceId) return;
@@ -609,9 +614,9 @@ export default function EditorPage() {
             <div className="flex items-center gap-2">
               <Input
                 value={docTitle}
-                onChange={(e) => setDocTitle(e.target.value)}
-                onBlur={updateDocumentTitle}
-                onKeyDown={(e) => e.key === "Enter" && updateDocumentTitle()}
+                onChange={(e) => updateDocumentTitle(e.target.value)}
+                onBlur={() => {}}
+                onKeyDown={() => {}}
                 className="w-auto min-w-[200px] bg-transparent border-0 font-medium text-sm focus-visible:ring-0 px-0"
                 disabled={loading}
               />
@@ -708,8 +713,8 @@ export default function EditorPage() {
                </div>
                <Input
                   value={docTitle}
-                  onChange={(e) => setDocTitle(e.target.value)}
-                  onBlur={updateDocumentTitle}
+                  onChange={(e) => updateDocumentTitle(e.target.value)}
+                  onBlur={() => {}}
                   className="text-5xl font-bold tracking-tight bg-transparent border-0 h-auto p-0 focus-visible:ring-0 mb-4"
                   placeholder="Untitled"
                />
