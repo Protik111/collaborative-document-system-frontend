@@ -674,8 +674,8 @@ export default function EditorPage() {
           <div className="flex items-center gap-3">
             {/* Active Collaborators */}
             <div className="flex -space-x-2 mr-4">
-              {activeCollaborators.slice(0, 5).map((u) => (
-                <div key={u.userId} className="relative group/avatar">
+              {activeCollaborators.slice(0, 5).map((u, idx) => (
+                <div key={u.userId || `active-${idx}`} className="relative group/avatar">
                   <Avatar className="h-8 w-8 border-2 border-background ring-2 ring-emerald-500/20 transition-all cursor-help">
                     <AvatarFallback className="text-[10px] bg-emerald-500/10 text-emerald-500 font-bold">
                       {u.email[0].toUpperCase()}
@@ -691,8 +691,8 @@ export default function EditorPage() {
               ))}
               
               {/* Show remaining members if any */}
-              {members.filter(m => !activeCollaborators.some(ac => ac.userId === m.userId)).slice(0, 2).map((m) => (
-                <Avatar key={m.userId} className="h-8 w-8 border-2 border-background opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help">
+              {members.filter(m => !activeCollaborators.some(ac => ac.userId === m.userId)).slice(0, 2).map((m, idx) => (
+                <Avatar key={m.userId || `member-avatar-${idx}`} className="h-8 w-8 border-2 border-background opacity-40 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-help">
                   <AvatarFallback className="text-[10px] bg-secondary">
                     {m.name?.[0] || m.email[0].toUpperCase()}
                   </AvatarFallback>
@@ -817,7 +817,7 @@ export default function EditorPage() {
 
             <div className="space-y-1">
               {blocks.map((block, index) => (
-                <div key={block.id} className="group relative py-1 focus-within:bg-accent/5 rounded-lg -mx-4 px-4 transition-colors">
+                <div key={block.id || `block-${index}`} className="group relative py-1 focus-within:bg-accent/5 rounded-lg -mx-4 px-4 transition-colors">
                   {/* Block Hover Drag Handle */}
                   <div className="block-handle group-hover:opacity-100">
                     <DropdownMenu>
@@ -942,8 +942,8 @@ export default function EditorPage() {
                     </Button>
                   </div>
 
-                  {versions.map((v) => (
-                    <div key={v.id} className="group relative pl-4 border-l border-border hover:border-primary transition-colors pb-6">
+                  {versions.map((v, idx) => (
+                    <div key={v.id || `version-${idx}`} className="group relative pl-4 border-l border-border hover:border-primary transition-colors pb-6">
                       <div className="absolute -left-1.5 top-1 h-3 w-3 rounded-full border-2 border-background bg-border group-hover:bg-primary transition-colors" />
                       <p className="text-sm font-bold">Version {v.version_number}</p>
                       <p className="text-xs text-muted-foreground mb-2">{v.change_summary || "Automated snapshot"}</p>
@@ -967,8 +967,8 @@ export default function EditorPage() {
                     </div>
                   </div>
 
-                  {members.map((m) => (
-                    <div key={m.userId} className="flex items-center justify-between group">
+                  {members.map((m, idx) => (
+                    <div key={m.userId || `member-side-${idx}`} className="flex items-center justify-between group">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="text-[10px]">{m.name?.[0] || m.email[0].toUpperCase()}</AvatarFallback>

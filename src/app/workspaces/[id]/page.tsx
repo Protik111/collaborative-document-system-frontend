@@ -248,9 +248,9 @@ export default function WorkspacePage() {
           </DialogContent>
         </Dialog>
 
-        {docs.map((doc) => (
+        {docs.map((doc, idx) => (
           <Card
-            key={doc.id}
+            key={doc.id || `doc-${idx}`}
             className="group relative cursor-pointer bg-white/[0.03] hover:bg-white/[0.05] transition-all duration-300 border-white/10 flex flex-col h-[200px] rounded-2xl overflow-hidden"
             onClick={() => router.push(`/editor/${doc.id}`)}
           >
@@ -354,7 +354,7 @@ export default function WorkspacePage() {
 
         {/* Member list */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {members.map((m) => {
+          {members.map((m, idx) => {
             const roleColors: Record<string, string> = {
               OWNER: "text-amber-400 bg-amber-400/10 border-amber-400/20",
               ADMIN: "text-blue-400 bg-blue-400/10 border-blue-400/20",
@@ -362,7 +362,7 @@ export default function WorkspacePage() {
               VIEWER: "text-neutral-400 bg-neutral-400/10 border-neutral-400/20",
             };
             return (
-              <div key={m.userId} className="group flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 transition-all">
+              <div key={m.userId || `member-${idx}`} className="group flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 transition-all">
                 <div className="flex items-center gap-3">
                   <Avatar className="size-10 border border-white/10">
                     <AvatarFallback className="bg-neutral-800 text-neutral-300 text-sm">
