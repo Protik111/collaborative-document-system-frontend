@@ -181,40 +181,30 @@ export default function EditorPage() {
 
     // Setup WebSocket
     const socket = getSocket();
-    socket?.emit("join_document", { docId, documentId: docId });
+    if (!socket || !docId) return;
 
-    const handleBlockUpdate = (payload: any) => {
-      const data = payload.block || payload;
-      const { blockId, content, updatedBy } = data;
-      
-      if (!blockId) return;
-      if (updatedBy === currentUser?.userId) return; // Skip own updates
-      
-      setBlocks((prev) =>
-        prev.map((b) => (b.id === blockId ? { ...b, content } : b)),
-      );
-    };
+    socket.emit("join_document", { documentId: docId });
 
-    socket?.on("active_users", (users: User[]) => {
-        setActiveCollaborators(users);
-      });
+    socket.on("active_users", (users: User[]) => {
+      setActiveCollaborators(users);
+    });
 
-      socket?.on("presence_update", ({ userId, email, blockId }: { userId: string; email: string; blockId: string | null }) => {
-        setBlockFocus((prev) => {
-          const newState = { ...prev };
-          // Remove old focus for this user
-          Object.keys(newState).forEach(key => {
-            if (newState[key].email === email) delete newState[key];
-          });
-          // Add new focus if applicable
-          if (blockId) {
-            const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-            const colorIndex = email.length % colors.length;
-            newState[blockId] = { email, color: colors[colorIndex] };
-          }
-          return newState;
+    socket.on("presence_update", ({ userId, email, blockId }: { userId: string; email: string; blockId: string | null }) => {
+      setBlockFocus((prev) => {
+        const newState = { ...prev };
+        // Remove old focus for this user
+        Object.keys(newState).forEach(key => {
+          if (newState[key].email === email) delete newState[key];
         });
+        // Add new focus if applicable
+        if (blockId) {
+          const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+          const colorIndex = email.length % colors.length;
+          newState[blockId] = { email, color: colors[colorIndex] };
+        }
+        return newState;
       });
+    });
 
     const handleUserJoined = (user: User) => {
       setActiveCollaborators((prev) => {
@@ -228,8 +218,8 @@ export default function EditorPage() {
       setActiveCollaborators((prev) => prev.filter((u) => u.userId !== userId));
     };
 
-    socket?.on("user_joined", handleUserJoined);
-    socket?.on("user_left", handleUserLeft);
+    socket.on("user_joined", handleUserJoined);
+    socket.on("user_left", handleUserLeft);
 
     const handleBlockCreated = (payload: any) => {
       const block = payload.block || payload;
@@ -272,25 +262,37 @@ export default function EditorPage() {
       setDocument((prev) => (prev ? { ...prev, title: data.title } : null));
     };
 
-    socket?.on("block_updated", handleBlockUpdate);
-    socket?.on("block_created", handleBlockCreated);
-    socket?.on("block_deleted", handleBlockDeleted);
-    socket?.on("blocks_reordered", handleBlocksReordered);
-    socket?.on("block_moved", handleBlockMoved);
-    socket?.on("title_updated", handleTitleUpdated);
+    const handleBlockUpdate = (payload: any) => {
+      const data = payload.block || payload;
+      const { blockId, content, updatedBy } = data;
+      
+      if (!blockId) return;
+      if (updatedBy === currentUser?.userId) return; // Skip own updates
+      
+      setBlocks((prev) =>
+        prev.map((b) => (b.id === blockId ? { ...b, content } : b)),
+      );
+    };
+
+    socket.on("block_updated", handleBlockUpdate);
+    socket.on("block_created", handleBlockCreated);
+    socket.on("block_deleted", handleBlockDeleted);
+    socket.on("blocks_reordered", handleBlocksReordered);
+    socket.on("block_moved", handleBlockMoved);
+    socket.on("title_updated", handleTitleUpdated);
 
     return () => {
-      socket?.emit("leave_document", { docId, documentId: docId });
-      socket?.off("block_updated", handleBlockUpdate);
-      socket?.off("block_created", handleBlockCreated);
-      socket?.off("block_deleted", handleBlockDeleted);
-      socket?.off("blocks_reordered", handleBlocksReordered);
-      socket?.off("block_moved", handleBlockMoved);
-      socket?.off("title_updated", handleTitleUpdated);
-      socket?.off("active_users");
-      socket?.off("presence_update");
-      socket?.off("user_joined", handleUserJoined);
-      socket?.off("user_left", handleUserLeft);
+      socket.emit("leave_document", { documentId: docId });
+      socket.off("block_updated");
+      socket.off("block_created");
+      socket.off("block_deleted");
+      socket.off("blocks_reordered");
+      socket.off("block_moved");
+      socket.off("title_updated");
+      socket.off("active_users");
+      socket.off("presence_update");
+      socket.off("user_joined");
+      socket.off("user_left");
 
       // Clear all pending update timers
       Object.values(updateTimerRef.current).forEach((timer) => clearTimeout(timer));
